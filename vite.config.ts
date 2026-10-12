@@ -1,2 +1,7 @@
 import { defineConfig } from 'vite';
-export default defineConfig({ base: '/limbus_battle_simulator/' });
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  base: '/limbus_battle_simulator/',
+  plugins: [react()],
+});

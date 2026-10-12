@@ -1,12 +1,11 @@
 // ============================================================
 // data/balance.ts - 밸런스 수치는 전부 여기서만 관리한다.
-// [문서 확정] = 기획 문서에 있는 값 / [가정] = 문서에 없어서 임시로 넣은 값
 // ============================================================
 
 import type { RewardTier, SkillSet, SkillStatKey, SkillTier } from '../core/types';
 
 // ------------------------------------------------------------
-// 기본 스펙 [문서 확정]
+// 기본 스펙
 // ------------------------------------------------------------
 
 export const BASE_SKILLS: SkillSet = {
@@ -15,13 +14,11 @@ export const BASE_SKILLS: SkillSet = {
   3: { basePower: 5, coinPower: 3, coinCount: 3 },
 };
 
-export const BASE_INITIAL_SANITY = 0;
-
-/** 층별 최대 체력: 100 + 층수 * 10 [문서 확정] */
+/** 층별 최대 체력: 100 + 층수 * 10. 플레이어/적 공통, 보상으로 변하지 않음 */
 export const maxHpForFloor = (floor: number): number => 100 + floor * 10;
 
 // ------------------------------------------------------------
-// 스킬 묶음 [문서 확정]: 1스킬 3개, 2스킬 2개, 3스킬 1개
+// 스킬 묶음: 1스킬 3개, 2스킬 2개, 3스킬 1개
 // ------------------------------------------------------------
 
 export const DECK_COMPOSITION: Record<SkillTier, number> = { 1: 3, 2: 2, 3: 1 };
@@ -31,18 +28,23 @@ export const DECK_COMPOSITION: Record<SkillTier, number> = { 1: 3, 2: 2, 3: 1 };
 // ------------------------------------------------------------
 
 export const COIN = {
-  /** 앞면 확률 = BASE_HEADS_PERCENT + 정신력 (%) [문서 확정] */
+  /** 앞면 확률(%) = baseHeadsPercent + 정신력 */
   baseHeadsPercent: 50,
-  sanityMin: -45, // [문서 확정]
-  sanityMax: 45, // [문서 확정]
+  /** 전투 시작(= 매 층 시작) 시 정신력 */
+  initialSanity: 0,
+  sanityMin: -45,
+  sanityMax: 45,
   /**
-   * 'dynamic': 합 승패에 따라 정신력 변동 / 'fixed': 항상 초기값 유지
-   * (문서: 밸런스에 따라 고정할 수도 있음)
+   * 'dynamic': 합 결과에 따라 정신력 변동 / 'fixed': 항상 initialSanity 유지
+   * (밸런스에 따라 고정으로 전환 가능)
    */
   sanityMode: 'dynamic' as 'dynamic' | 'fixed',
-  /** [가정] 합 승리 시 +, 패배 시 - 되는 양. 합 전체 기준인지 라운드 기준인지는 미정 */
+  /** 합에서 이겼을 때 정신력 변화량 */
   sanityOnClashWin: 5,
-  sanityOnClashLose: -5,
+  /** 합에서 졌을 때 정신력 변화량 (현재는 변동 없음) */
+  sanityOnClashLose: 0,
+  // 정신력 변동 규칙: 스킬 하나의 합 전체가 끝난 시점(한쪽 코인이 0)에 승자/패자 각각 1회만 변동.
+  // 합 도중 라운드에서는 변하지 않고, 변동은 공격 코인을 굴리기 전에 적용된다.
 };
 
 // ------------------------------------------------------------
@@ -51,7 +53,7 @@ export const COIN = {
 
 /**
  * 보상 증가량 표. 배열 인덱스 0/1/2 = 보상 티어 1/2/3.
- * null = 해당 티어에서는 등장하지 않음 (문서의 x) [문서 확정]
+ * null = 해당 티어에서는 등장하지 않음
  */
 export type RewardAmountTable = Record<
   SkillTier,
@@ -60,23 +62,23 @@ export type RewardAmountTable = Record<
 
 export const REWARD_TABLE: RewardAmountTable = {
   1: {
-    basePower: [1, 2, 3],
-    coinPower: [null, 1, 2],
+    basePower: [1, 2, null],
+    coinPower: [null, null, 1],
     coinCount: [null, null, 1],
   },
   2: {
-    basePower: [2, 3, 4],
+    basePower: [2, 3, null],
     coinPower: [null, 1, 2],
     coinCount: [null, null, 1],
   },
   3: {
-    basePower: [3, 4, 5],
+    basePower: [3, 4, null],
     coinPower: [null, 1, 2],
-    coinCount: [null, 1, 2],
+    coinCount: [null, 1, 1],
   },
 };
 
-/** [가정] 보상 티어 등장 가중치 (높은 티어일수록 낮음). 시뮬레이션으로 조정 */
+/** 보상 티어 등장 가중치 (높은 티어일수록 낮음). 시뮬레이션으로 조정 */
 export const REWARD_TIER_WEIGHTS: Record<RewardTier, number> = {
   1: 60,
   2: 30,
@@ -84,23 +86,18 @@ export const REWARD_TIER_WEIGHTS: Record<RewardTier, number> = {
 };
 
 export const REWARDS = {
-  /** 층 시작 시 얻는 보상 횟수 n (기본 1, 템포를 높이려면 2~3) [문서 확정] */
+  /** 층 시작 시 얻는 보상 횟수 n (기본 1, 템포를 높이려면 2~3) */
   picksPerFloor: 1,
-  /** [가정] 한 번에 제시되는 선택지 개수 */
+  /** 한 번에 제시되는 선택지 개수 */
   choicesPerPick: 3,
 };
 
-// ------------------------------------------------------------
-// 적 생성
-// ------------------------------------------------------------
-
-export const ENEMY = {
-  /**
-   * [가정] 적이 받는 보상 횟수 = (floor + 랜덤(-jitter ~ +jitter)) * picksPerFloor.
-   * 문서의 "랜덤한 층수*n개"를 이렇게 해석함. 0이면 플레이어와 같은 횟수.
-   */
-  rewardCountJitter: 1,
-};
+/**
+ * 층 진입 시점까지 받은 보상 횟수 (플레이어는 선택, 적은 랜덤으로 적용)
+ * 플레이어는 층 시작마다 받으므로 floor 층에서는 floor * n 회.
+ */
+export const rewardCountForFloor = (floor: number): number =>
+  floor * REWARDS.picksPerFloor;
 
 // ------------------------------------------------------------
 // 안전장치

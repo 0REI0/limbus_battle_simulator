@@ -26,7 +26,7 @@ export interface Rng {
 }
 
 // ------------------------------------------------------------
-// 스킬 / 유닛 스탯
+// 스킬 스펙 (보상으로 성장하는 유일한 값)
 // ------------------------------------------------------------
 
 /** 스킬 하나의 스펙 */
@@ -37,19 +37,18 @@ export interface SkillStats {
 }
 export type SkillStatKey = keyof SkillStats;
 
-/** 1/2/3스킬 세트 */
+/** 1/2/3스킬 세트. 플레이어/적의 "성장하는 스펙"은 이것 하나뿐이다. */
 export type SkillSet = Record<SkillTier, SkillStats>;
 
-/** 유닛의 "성장하는" 스펙 (보상으로 변하는 부분) */
-export interface UnitStats {
-  maxHp: number;
-  initialSanity: number; // 기본 0 (고정 모드에서는 이 값으로 계속 유지)
-  skills: SkillSet;
-}
+// ------------------------------------------------------------
+// 전투 상태
+// 최대 체력은 층수로만 결정되고, 체력/정신력은 층마다 초기화되므로
+// 전투 상태는 매 전투 시작 시 새로 만든다.
+// ------------------------------------------------------------
 
-/** 전투 중 변하는 상태 */
 export interface Combatant {
-  stats: UnitStats;
+  skills: SkillSet;
+  maxHp: number; // maxHpForFloor(floor)로 결정
   hp: number;
   sanity: number; // -45 ~ +45
   /** 이번 묶음에서 아직 쓰지 않은 스킬들 (앞에서부터 꺼냄). 비면 새 묶음으로 리셋 */
@@ -119,11 +118,9 @@ export type BattleEvent =
     }
   | { type: 'battleEnd'; winner: Side; turns: number };
 
+/** 전투 결과. 전투 후 상태는 다음 층에서 초기화되므로 담지 않는다. */
 export interface BattleResult {
   winner: Side;
   turns: number;
   events: BattleEvent[];
-  /** 전투 후 상태 (정신력은 층 클리어 시 초기화되므로 hp만 의미 있음) */
-  player: Combatant;
-  enemy: Combatant;
 }
