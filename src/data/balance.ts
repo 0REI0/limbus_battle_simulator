@@ -105,3 +105,6 @@ export const rewardCountForFloor = (floor: number): number =>
 
 /** 무한 루프 방지: 한 전투의 최대 턴 수 (이 이상이면 비정상으로 간주) */
 export const MAX_TURNS_PER_BATTLE = 500;
+
+/** 무한 루프 방지: 한 번의 합에서 허용하는 최대 라운드 수 (위력이 계속 같을 때 대비) */
+export const MAX_CLASH_ROUNDS = 1000;

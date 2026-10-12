@@ -11,3 +11,19 @@ export function fixedRng(values: number[]): Rng {
     shuffle: (items) => [...items],
   };
 }
+
+import type { Combatant, SkillSet, SkillStats, SkillTier } from '../src/core/types';
+
+/** 세 스킬이 모두 같은 스펙인 SkillSet */
+export function uniformSkills(stats: SkillStats): SkillSet {
+  return { 1: { ...stats }, 2: { ...stats }, 3: { ...stats } };
+}
+
+/** 테스트용 Combatant (덱 순서를 직접 지정, 난수 소비 없음) */
+export function makeCombatant(
+  skills: SkillSet,
+  hp: number,
+  deck: SkillTier[] = [1, 1, 1, 2, 2, 3],
+): Combatant {
+  return { skills, maxHp: hp, hp, sanity: 0, deck };
+}
