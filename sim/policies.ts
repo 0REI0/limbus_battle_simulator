@@ -1,0 +1,92 @@
+// ============================================================
+// sim/policies.ts - 시뮬레이션용 "플레이어 보상 선택 전략"
+// 전략이 다양하게 존재해야 보상표가 의미 있는 선택을 만드는지 확인할 수 있다.
+//  - random 대비 다른 전략이 확실히 더 멀리 가면 → 선택이 의미 있음
+//  - 특정 전략이 압도적이면 → 그 보상이 너무 강한 것 (밸런스 조정 대상)
+// ============================================================
+
+import { applyReward } from '../src/core/rewards';
+import type { RunState } from '../src/core/run';
+import type { Reward, Rng, SkillSet, SkillStatKey } from '../src/core/types';
+import { DECK_COMPOSITION } from '../src/data/balance';
+
+export interface Policy {
+  name: string;
+  description: string;
+  /** 현재 선택지 중 고를 보상의 id를 반환 */
+  pick(state: RunState, rng: Rng): string;
+}
+
+/** 점수가 가장 높은 선택지를 고른다 (동점이면 랜덤) */
+function pickBest(choices: readonly Reward[], score: (r: Reward) => number, rng: Rng): string {
+  let best = -Infinity;
+  let ties: Reward[] = [];
+  for (const reward of choices) {
+    const s = score(reward);
+    if (s > best) {
+      best = s;
+      ties = [reward];
+    } else if (s === best) {
+      ties.push(reward);
+    }
+  }
+  return ties[rng.int(0, ties.length - 1)].id;
+}
+
+/**
+ * 스킬 사용 1회당 기대 데미지 (정신력 0, 앞면 확률 50% 가정) 를 묶음 구성 비율로 가중 평균.
+ * i번째 타격 위력 = 기본 + 코인 위력 * (평균 앞면 수 = 0.5 * i)
+ * 합에서의 유불리는 고려하지 않는 단순 지표.
+ */
+export function expectedDamage(skills: SkillSet): number {
+  let total = 0;
+  for (const tier of [1, 2, 3] as const) {
+    const { basePower, coinPower, coinCount } = skills[tier];
+    const damage = coinCount * basePower + 0.5 * coinPower * ((coinCount * (coinCount + 1)) / 2);
+    total += DECK_COMPOSITION[tier] * damage;
+  }
+  return total;
+}
+
+const STAT_RANK: Record<SkillStatKey, number> = { basePower: 0, coinPower: 1, coinCount: 2 };
+
+export const POLICIES: Policy[] = [
+  {
+    name: 'random',
+    description: '선택지 중 무작위 (기준선)',
+    pick: (state, rng) => pickBest(state.choices, () => 0, rng),
+  },
+  {
+    name: 'maxAmount',
+    description: '증가량 숫자가 가장 큰 보상',
+    pick: (state, rng) => pickBest(state.choices, (r) => r.amount, rng),
+  },
+  {
+    name: 'skill1',
+    description: '1스킬 강화 우선',
+    pick: (state, rng) =>
+      pickBest(state.choices, (r) => (r.skillTier === 1 ? 1000 : 0) + r.amount, rng),
+  },
+  {
+    name: 'skill3',
+    description: '3스킬 강화 우선',
+    pick: (state, rng) =>
+      pickBest(state.choices, (r) => (r.skillTier === 3 ? 1000 : 0) + r.amount, rng),
+  },
+  {
+    name: 'coinCount',
+    description: '코인 개수 > 코인 위력 > 기본 위력 순으로 우선',
+    pick: (state, rng) =>
+      pickBest(state.choices, (r) => STAT_RANK[r.stat] * 1000 + r.amount, rng),
+  },
+  {
+    name: 'greedyDmg',
+    description: '기대 데미지가 가장 많이 오르는 보상',
+    pick: (state, rng) =>
+      pickBest(
+        state.choices,
+        (r) => expectedDamage(applyReward(state.skills, r)) - expectedDamage(state.skills),
+        rng,
+      ),
+  },
+];
