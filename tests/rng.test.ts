@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRng } from '../src/core/rng';
+import { createRng, deriveSeed } from '../src/core/rng';
 
 describe('createRng', () => {
   it('같은 시드는 같은 난수열을 만든다', () => {
@@ -38,5 +38,27 @@ describe('createRng', () => {
     const shuffled = rng.shuffle(original);
     expect(original).toEqual([1, 2, 3, 4, 5, 6]);
     expect([...shuffled].sort()).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});
+
+describe('deriveSeed', () => {
+  it('같은 입력이면 같은 시드를 만든다', () => {
+    expect(deriveSeed(123, 7)).toBe(deriveSeed(123, 7));
+  });
+
+  it('seed나 salt가 다르면 다른 시드를 만든다', () => {
+    const seeds = new Set<number>();
+    for (let salt = 0; salt < 200; salt++) seeds.add(deriveSeed(123, salt));
+    expect(seeds.size).toBe(200);
+    expect(deriveSeed(1, 5)).not.toBe(deriveSeed(2, 5));
+  });
+
+  it('부호 없는 32비트 정수다', () => {
+    for (let salt = 0; salt < 100; salt++) {
+      const v = deriveSeed(999, salt);
+      expect(Number.isInteger(v)).toBe(true);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThan(2 ** 32);
+    }
   });
 });
