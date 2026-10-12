@@ -5,9 +5,11 @@
 //   1) 양쪽이 묶음에서 스킬을 하나씩 뽑는다
 //   2) 합: 양쪽 코인을 한 번에 굴려 위력 비교 → 낮은 쪽 코인 -1 (같으면 변화 없음)
 //          한쪽 코인이 0이 될 때까지 반복 (정신력은 합 도중 변하지 않음)
+//          MAX_CLASH_ROUNDS까지 끝나지 않으면 무승부: 공격/정신력 변동 없이 다음 턴
 //   3) 합 종료 시 정신력 변동 (승자/패자 각 1회) - 공격 코인을 굴리기 전에 적용
 //   4) 합에서 이긴 쪽만 공격: 남은 코인을 한 번에 굴려 타격별 데미지 계산
 //   5) 상대 체력이 0이 되면 전투 종료, 아니면 다음 턴
+//      MAX_TURNS_PER_BATTLE 안에 끝나지 않으면 플레이어 패배 (목표 턴 제한)
 // ============================================================
 
 import {
@@ -72,10 +74,13 @@ export function runBattle(playerInit: Combatant, enemyInit: Combatant, rng: Rng)
     };
 
     let round = 0;
+    let stalemate = false;
     while (counts.player > 0 && counts.enemy > 0) {
-      if (++round > MAX_CLASH_ROUNDS) {
-        throw new Error(`합이 ${MAX_CLASH_ROUNDS}라운드를 넘어도 끝나지 않음 (위력이 계속 같은지 확인)`);
+      if (round >= MAX_CLASH_ROUNDS) {
+        stalemate = true;
+        break;
       }
+      round++;
 
       const roll = (side: Side) => {
         const coins = rollCoins(counts[side], units[side].sanity, rng);
@@ -101,6 +106,12 @@ export function runBattle(playerInit: Combatant, enemyInit: Combatant, rng: Rng)
         enemy: side(e, 'enemy'),
         result,
       });
+    }
+
+    if (stalemate) {
+      // 무승부: 양측 공격 없음, 정신력 변동 없음
+      events.push({ type: 'clashStalemate', rounds: round });
+      continue;
     }
 
     const winner: Side = counts.player > 0 ? 'player' : 'enemy';
@@ -138,10 +149,17 @@ export function runBattle(playerInit: Combatant, enemyInit: Combatant, rng: Rng)
 
     // 5) 종료 판정
     if (target.hp === 0) {
-      events.push({ type: 'battleEnd', winner, turns: turn });
-      return { winner, turns: turn, events };
+      events.push({ type: 'battleEnd', winner, turns: turn, reason: 'kill' });
+      return { winner, reason: 'kill', turns: turn, events };
     }
   }
 
-  throw new Error(`전투가 ${MAX_TURNS_PER_BATTLE}턴을 넘어도 끝나지 않음`);
+  // 제한 턴 안에 처치하지 못함 → 플레이어 패배
+  events.push({
+    type: 'battleEnd',
+    winner: 'enemy',
+    turns: MAX_TURNS_PER_BATTLE,
+    reason: 'turnLimit',
+  });
+  return { winner: 'enemy', reason: 'turnLimit', turns: MAX_TURNS_PER_BATTLE, events };
 }

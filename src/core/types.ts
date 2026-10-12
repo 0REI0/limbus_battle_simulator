@@ -98,6 +98,9 @@ export interface AttackHit {
   targetHpAfter: number;
 }
 
+/** kill: 체력이 0이 되어 종료 / turnLimit: 제한 턴 초과로 플레이어 패배 */
+export type BattleEndReason = 'kill' | 'turnLimit';
+
 export type BattleEvent =
   | { type: 'turnStart'; turn: number; playerTier: SkillTier; enemyTier: SkillTier }
   | {
@@ -108,6 +111,8 @@ export type BattleEvent =
       result: Side | 'draw'; // 위력이 높은 쪽 (같으면 draw, 코인 감소 없음)
     }
   | { type: 'clashEnd'; winner: Side; remainingCoins: number }
+  /** 합이 MAX_CLASH_ROUNDS까지 끝나지 않음: 무승부 처리, 양측 공격 없음, 정신력 변동 없음 */
+  | { type: 'clashStalemate'; rounds: number }
   | { type: 'sanityChange'; side: Side; from: number; to: number }
   | {
       type: 'attack';
@@ -116,11 +121,12 @@ export type BattleEvent =
       coins: Coins; // 한 번에 굴린 전체 코인
       hits: AttackHit[]; // UI는 이걸 하나씩 공개
     }
-  | { type: 'battleEnd'; winner: Side; turns: number };
+  | { type: 'battleEnd'; winner: Side; turns: number; reason: BattleEndReason };
 
 /** 전투 결과. 전투 후 상태는 다음 층에서 초기화되므로 담지 않는다. */
 export interface BattleResult {
   winner: Side;
+  reason: BattleEndReason;
   turns: number;
   events: BattleEvent[];
 }

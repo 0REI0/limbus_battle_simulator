@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { createCombatant, runBattle } from '../src/core/battle';
 import { createRng } from '../src/core/rng';
 import type { BattleEvent } from '../src/core/types';
-import { BASE_SKILLS, COIN } from '../src/data/balance';
+import {
+  BASE_SKILLS,
+  COIN,
+  MAX_CLASH_ROUNDS,
+  MAX_TURNS_PER_BATTLE,
+} from '../src/data/balance';
 import { fixedRng, makeCombatant, uniformSkills } from './helpers';
 
 const types = (events: BattleEvent[]) => events.map((e) => e.type);
@@ -105,15 +110,16 @@ describe('실제 스펙으로 여러 판 돌리기', () => {
 
   it('모든 전투가 정상 종료되고 불변 조건을 지킨다', () => {
     for (let seed = 1; seed <= 300; seed++) {
-      const { events, winner, turns } = play(seed);
+      const { events, winner, turns, reason } = play(seed);
 
       const last = events[events.length - 1];
-      expect(last).toEqual({ type: 'battleEnd', winner, turns });
+      expect(last).toEqual({ type: 'battleEnd', winner, turns, reason });
       expect(events.filter((e) => e.type === 'battleEnd')).toHaveLength(1);
 
       let clashWinner: string | null = null;
       let remaining = 0;
       for (const e of events) {
+        if (e.type === 'turnStart') clashWinner = null;
         if (e.type === 'clashEnd') {
           clashWinner = e.winner;
           remaining = e.remainingCoins;
@@ -141,5 +147,77 @@ describe('실제 스펙으로 여러 판 돌리기', () => {
     } finally {
       COIN.sanityMode = original;
     }
+  });
+});
+
+describe('전투 제한', () => {
+  const draw = { basePower: 5, coinPower: 0, coinCount: 1 }; // 항상 같은 위력 → 영원히 무승부
+
+  it('제한 상수는 100이다', () => {
+    expect(MAX_CLASH_ROUNDS).toBe(100);
+    expect(MAX_TURNS_PER_BATTLE).toBe(100);
+  });
+
+  it('합이 끝나지 않으면 무승부: 공격도 정신력 변동도 없이 다음 턴으로 넘어간다', () => {
+    // 1턴: 1스킬끼리 위력 동일 → 무승부 / 2턴: 플레이어 2스킬(9) > 적(5) → 승리 후 처치
+    const player = makeCombatant(
+      { 1: draw, 2: { ...draw, basePower: 9 }, 3: { ...draw, basePower: 9 } },
+      100,
+      [1, 2, 3, 1, 2, 3],
+    );
+    const enemy = makeCombatant(uniformSkills(draw), 9);
+    const result = runBattle(player, enemy, fixedRng([0.5]));
+
+    const firstTurnEnd = result.events.findIndex((e, i) => i > 0 && e.type === 'turnStart');
+    const turn1 = result.events.slice(0, firstTurnEnd);
+    expect(turn1.filter((e) => e.type === 'clashRound')).toHaveLength(MAX_CLASH_ROUNDS);
+    expect(turn1[turn1.length - 1]).toEqual({ type: 'clashStalemate', rounds: MAX_CLASH_ROUNDS });
+    expect(turn1.some((e) => e.type === 'attack' || e.type === 'sanityChange')).toBe(false);
+
+    expect(result.turns).toBe(2);
+    expect(result.winner).toBe('player');
+    expect(result.reason).toBe('kill');
+    expect(result.events.filter((e) => e.type === 'attack')).toHaveLength(1);
+  });
+
+  it('합이 계속 무승부면 제한 턴 후 플레이어 패배', () => {
+    const result = runBattle(
+      makeCombatant(uniformSkills(draw), 100),
+      makeCombatant(uniformSkills(draw), 100),
+      fixedRng([0.5]),
+    );
+    expect(result.winner).toBe('enemy');
+    expect(result.reason).toBe('turnLimit');
+    expect(result.turns).toBe(MAX_TURNS_PER_BATTLE);
+    expect(result.events.filter((e) => e.type === 'clashStalemate')).toHaveLength(
+      MAX_TURNS_PER_BATTLE,
+    );
+    expect(result.events.some((e) => e.type === 'attack')).toBe(false);
+    expect(result.events[result.events.length - 1]).toEqual({
+      type: 'battleEnd',
+      winner: 'enemy',
+      turns: MAX_TURNS_PER_BATTLE,
+      reason: 'turnLimit',
+    });
+  });
+
+  // 플레이어는 매 턴 합에서 이기지만 턴당 1데미지만 줌
+  const slowPlayer = () =>
+    makeCombatant(uniformSkills({ basePower: 1, coinPower: 0, coinCount: 1 }), 100);
+  const zeroEnemy = (hp: number) =>
+    makeCombatant(uniformSkills({ basePower: 0, coinPower: 0, coinCount: 1 }), hp);
+
+  it('제한 턴의 마지막 턴에 처치하면 승리한다', () => {
+    const result = runBattle(slowPlayer(), zeroEnemy(MAX_TURNS_PER_BATTLE), fixedRng([0.5]));
+    expect(result.winner).toBe('player');
+    expect(result.reason).toBe('kill');
+    expect(result.turns).toBe(MAX_TURNS_PER_BATTLE);
+  });
+
+  it('제한 턴 안에 처치하지 못하면 합에서 계속 이겨도 패배한다', () => {
+    const result = runBattle(slowPlayer(), zeroEnemy(MAX_TURNS_PER_BATTLE + 1), fixedRng([0.5]));
+    expect(result.winner).toBe('enemy');
+    expect(result.reason).toBe('turnLimit');
+    expect(result.events.filter((e) => e.type === 'attack')).toHaveLength(MAX_TURNS_PER_BATTLE);
   });
 });
