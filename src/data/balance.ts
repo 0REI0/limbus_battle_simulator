@@ -11,7 +11,7 @@ import type { RewardEffect, RewardTier, SkillSet, SkillTier } from '../core/type
 export const BASE_SKILLS: SkillSet = {
   1: { basePower: 4, coinPower: 7, coinCount: 1 },
   2: { basePower: 4, coinPower: 5, coinCount: 2 },
-  3: { basePower: 6, coinPower: 4, coinCount: 2 },
+  3: { basePower: 4, coinPower: 3, coinCount: 3 },
 };
 
 /** 층별 최대 체력: 100 + 층수 * 10. 플레이어/적 공통, 보상으로 변하지 않음 */
@@ -70,54 +70,48 @@ const count = (skill: SkillTier, amount: number): RewardEffect => ({ skillTier: 
  */
 export const REWARD_TABLE: Record<RewardTier, RewardEffect[][]> = {
   1: [
-    [power(1, 3)],
-    [base(3, 1)],
+    [power(1, 1)],
     [power(2, 1)],
-    [base(1, 1)],
-    [power(3, 2)],
+    [power(3, 1)],
+    [base(1, 1), power(1, -1)],
+    [base(2, 1), power(2, -1)],
+    [base(3, 2), power(3, -1)],
   ],
   2: [
-    [count(2, 1), power(2, -2)],
-    [base(3, 2)],
-    [power(1, 4)],
-    [power(3, 3)],
+    [base(1, 1)],
     [base(2, 1)],
-    [base(1, 2)],
+    [base(3, 2)],
+    [base(1, 2), power(1, -1)],
+    [base(2, 2), power(2, -1)],
+    [base(3, 3), power(3, -1)],
   ],
   3: [
-    [count(3, 1), base(3, 1), power(3, -2)],
-    [count(3, 1), power(3, -1)],
-    [power(3, 4)],
-    [base(3, 3)],
-    [base(1, 3)],
+    [power(1, 2)],
     [power(2, 2)],
+    [power(3, 2)],
+    [base(1, 2)],
+    [base(2, 2)],
+    [base(3, 3)],
   ],
   4: [
     [count(1, 1), power(1, -2)],
     [count(2, 1), power(2, -1)],
-    [base(1, 4)],
-    [count(2, 1), base(2, 1), power(2, -2)],
-    [power(2, 3)],
-    [base(3, 4)],
-    [base(2, 2)],
+    [count(3, 1), power(3, 1)]
   ],
   5: [
-    [base(2, 3)],
-    [base(3, 5)],
-    [base(2, 4)],
-    [base(3, 6)],
-    [base(1, 5)],
     [count(1, 1), power(1, -1)],
+    [count(2, 1)],
+    [count(3, 1), power(3, 2)],
   ],
 };
 
 /** 보상 티어 등장 가중치 (높은 티어일수록 낮음). 시뮬레이션으로 조정 */
 export const REWARD_TIER_WEIGHTS: Record<RewardTier, number> = {
-  1: 40,
-  2: 28,
-  3: 18,
+  1: 35,
+  2: 30,
+  3: 20,
   4: 10,
-  5: 4,
+  5: 5,
 };
 
 export const REWARDS = {
