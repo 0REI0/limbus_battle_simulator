@@ -3,68 +3,86 @@ import { createRng } from '../src/core/rng';
 import {
   applyRandomRewards,
   applyReward,
+  describeReward,
   generateChoices,
   getRewardPool,
   pickReward,
+  rewardId,
   rollRewardTier,
 } from '../src/core/rewards';
-import type { SkillSet } from '../src/core/types';
-import { BASE_SKILLS, REWARDS } from '../src/data/balance';
+import type { Reward } from '../src/core/types';
+import {
+  BASE_SKILLS,
+  REWARD_TABLE,
+  REWARD_TIERS,
+  REWARD_TIER_WEIGHTS,
+  REWARDS,
+} from '../src/data/balance';
 import { fixedRng } from './helpers';
 
-const sumStats = (s: SkillSet) =>
-  ([1, 2, 3] as const).reduce(
-    (t, k) => t + s[k].basePower + s[k].coinPower + s[k].coinCount,
-    0,
-  );
+const reward = (effects: Reward['effects']): Reward => ({
+  id: rewardId(1, effects),
+  rewardTier: 1,
+  effects,
+});
 
-describe('getRewardPool', () => {
-  it('티어별 후보 개수: 1티어 3개, 2티어 6개, 3티어 6개', () => {
-    expect(getRewardPool(1)).toHaveLength(3);
-    expect(getRewardPool(2)).toHaveLength(6);
-    expect(getRewardPool(3)).toHaveLength(6);
+describe('보상 풀', () => {
+  it('보상 티어는 5개이고 각 티어에 보상이 있다', () => {
+    expect(REWARD_TIERS).toHaveLength(5);
+    for (const tier of REWARD_TIERS) expect(getRewardPool(tier).length).toBeGreaterThan(0);
   });
 
-  it('1티어는 기본 위력 증가뿐이고 증가량은 스킬별 1/2/3', () => {
-    expect(getRewardPool(1).map((r) => [r.skillTier, r.stat, r.amount])).toEqual([
-      [1, 'basePower', 1],
-      [2, 'basePower', 2],
-      [3, 'basePower', 3],
-    ]);
+  it('풀의 크기와 순서는 REWARD_TABLE을 그대로 따른다', () => {
+    for (const tier of REWARD_TIERS) {
+      const pool = getRewardPool(tier);
+      expect(pool).toHaveLength(REWARD_TABLE[tier].length);
+      pool.forEach((r, i) => {
+        expect(r.rewardTier).toBe(tier);
+        expect(r.effects).toEqual(REWARD_TABLE[tier][i]);
+      });
+    }
   });
 
-  it('3티어에는 기본 위력 증가가 없다', () => {
-    expect(getRewardPool(3).some((r) => r.stat === 'basePower')).toBe(false);
+  it('모든 보상은 효과가 1개 이상이고 id가 서로 다르다', () => {
+    const all = REWARD_TIERS.flatMap((t) => getRewardPool(t));
+    expect(all.every((r) => r.effects.length >= 1)).toBe(true);
+    expect(new Set(all.map((r) => r.id)).size).toBe(all.length);
   });
 
-  it('보상 id는 모두 서로 다르다', () => {
-    const ids = [1, 2, 3].flatMap((t) => getRewardPool(t as 1 | 2 | 3).map((r) => r.id));
-    expect(new Set(ids).size).toBe(ids.length);
+  it('id와 설명 문자열 형식', () => {
+    const effects = [
+      { skillTier: 1, stat: 'coinCount', amount: 1 },
+      { skillTier: 1, stat: 'coinPower', amount: -1 },
+    ] as const;
+    expect(rewardId(3, effects)).toBe('t3:1.coinCount+1,1.coinPower-1');
+    expect(describeReward(reward([...effects]))).toBe('1스킬 코인 개수 +1 / 1스킬 코인 위력 -1');
   });
 });
 
-describe('티어 추첨 (가중치 60/30/10)', () => {
-  it('경계값에서 올바른 티어가 나온다', () => {
-    const tierAt = (v: number) => rollRewardTier(fixedRng([v]));
-    expect(tierAt(0.0)).toBe(1);
-    expect(tierAt(0.59)).toBe(1);
-    expect(tierAt(0.6)).toBe(2);
-    expect(tierAt(0.89)).toBe(2);
-    expect(tierAt(0.9)).toBe(3);
-    expect(tierAt(0.99)).toBe(3);
+describe('티어 추첨', () => {
+  const total = REWARD_TIERS.reduce((s, t) => s + REWARD_TIER_WEIGHTS[t], 0);
+
+  it('각 티어 구간의 한가운데 난수는 해당 티어가 나온다', () => {
+    let acc = 0;
+    for (const tier of REWARD_TIERS) {
+      const w = REWARD_TIER_WEIGHTS[tier];
+      if (w > 0) expect(rollRewardTier(fixedRng([(acc + w / 2) / total]))).toBe(tier);
+      acc += w;
+    }
   });
 
-  it('많이 뽑으면 비율이 가중치에 가깝다', () => {
+  it('많이 뽑으면 티어 비율이 가중치에 가깝다', () => {
     const rng = createRng(11);
-    const counts = { 1: 0, 2: 0, 3: 0 };
-    const n = 20000;
-    for (let i = 0; i < n; i++) counts[pickReward(rng)!.rewardTier]++;
-    expect(counts[1] / n).toBeGreaterThan(0.57);
-    expect(counts[1] / n).toBeLessThan(0.63);
-    expect(counts[2] / n).toBeGreaterThan(0.27);
-    expect(counts[2] / n).toBeLessThan(0.33);
-    expect(counts[3] / n).toBeGreaterThan(0.08);
-    expect(counts[3] / n).toBeLessThan(0.12);
+    const n = 30000;
+    const counts = new Map<number, number>();
+    for (let i = 0; i < n; i++) {
+      const tier = pickReward(rng)!.rewardTier;
+      counts.set(tier, (counts.get(tier) ?? 0) + 1);
+    }
+    for (const tier of REWARD_TIERS) {
+      const expected = REWARD_TIER_WEIGHTS[tier] / total;
+      expect(Math.abs((counts.get(tier) ?? 0) / n - expected)).toBeLessThan(0.02);
+    }
   });
 });
 
@@ -82,14 +100,15 @@ describe('generateChoices', () => {
   });
 
   it('뽑힌 티어의 후보가 소진되면 남은 티어에서 뽑는다', () => {
-    // 난수 0.0 → 항상 가장 낮은 티어(1티어)를 뽑으려 함. 1티어 후보는 3개뿐
-    const choices = generateChoices(fixedRng([0.0]), 4);
-    expect(choices.map((c) => c.rewardTier)).toEqual([1, 1, 1, 2]);
-    expect(new Set(choices.map((c) => c.id)).size).toBe(4);
+    // 난수 0.0 → 항상 가장 낮은 티어(1티어)를 뽑으려 함
+    const n1 = getRewardPool(1).length;
+    const choices = generateChoices(fixedRng([0.0]), n1 + 1);
+    expect(choices.map((c) => c.rewardTier)).toEqual([...Array(n1).fill(1), 2]);
+    expect(new Set(choices.map((c) => c.id)).size).toBe(n1 + 1);
   });
 
   it('가능한 보상 종류보다 많이 요청하면 가능한 만큼만 반환한다', () => {
-    const total = [1, 2, 3].reduce((n, t) => n + getRewardPool(t as 1 | 2 | 3).length, 0);
+    const total = REWARD_TIERS.reduce((n, t) => n + getRewardPool(t).length, 0);
     const choices = generateChoices(createRng(1), total + 10);
     expect(choices).toHaveLength(total);
     expect(new Set(choices.map((c) => c.id)).size).toBe(total);
@@ -97,15 +116,38 @@ describe('generateChoices', () => {
 });
 
 describe('applyReward', () => {
-  it('해당 스킬의 해당 수치만 증가하고 원본은 유지된다', () => {
-    const reward = getRewardPool(2).find((r) => r.skillTier === 3 && r.stat === 'coinPower')!;
-    const result = applyReward(BASE_SKILLS, reward);
+  const BASE = { ...BASE_SKILLS }; // 비교용 (원본 변경 여부 확인)
 
-    expect(result[3].coinPower).toBe(BASE_SKILLS[3].coinPower + reward.amount);
-    expect(result[3].basePower).toBe(BASE_SKILLS[3].basePower);
-    expect(result[1]).toEqual(BASE_SKILLS[1]);
+  it('효과가 여러 개인 보상은 모두 적용된다', () => {
+    const r = reward([
+      { skillTier: 1, stat: 'coinCount', amount: 1 },
+      { skillTier: 1, stat: 'coinPower', amount: -1 },
+      { skillTier: 3, stat: 'basePower', amount: 2 },
+    ]);
+    const result = applyReward(BASE_SKILLS, r);
+
+    expect(result[1].coinCount).toBe(BASE_SKILLS[1].coinCount + 1);
+    expect(result[1].coinPower).toBe(BASE_SKILLS[1].coinPower - 1);
+    expect(result[1].basePower).toBe(BASE_SKILLS[1].basePower);
+    expect(result[3].basePower).toBe(BASE_SKILLS[3].basePower + 2);
     expect(result[2]).toEqual(BASE_SKILLS[2]);
-    expect(BASE_SKILLS[3].coinPower).toBe(3); // 원본 불변
+  });
+
+  it('원본은 변경하지 않는다', () => {
+    applyReward(BASE_SKILLS, reward([{ skillTier: 2, stat: 'basePower', amount: 5 }]));
+    expect(BASE_SKILLS).toEqual(BASE);
+  });
+
+  it('감소 효과는 한계 밑으로 내려가지 않는다 (기본/코인 위력 0, 코인 개수 1)', () => {
+    const result = applyReward(
+      BASE_SKILLS,
+      reward([
+        { skillTier: 1, stat: 'coinPower', amount: -100 },
+        { skillTier: 1, stat: 'basePower', amount: -100 },
+        { skillTier: 1, stat: 'coinCount', amount: -100 },
+      ]),
+    );
+    expect(result[1]).toEqual({ basePower: 0, coinPower: 0, coinCount: 1 });
   });
 });
 
@@ -114,10 +156,11 @@ describe('applyRandomRewards (적 생성용)', () => {
     expect(applyRandomRewards(BASE_SKILLS, 0, createRng(1))).toEqual(BASE_SKILLS);
   });
 
-  it('적용할수록 스펙 총합이 늘고 원본은 변하지 않는다', () => {
+  it('적용하면 스펙이 달라지고 원본은 변하지 않는다', () => {
+    const before = JSON.stringify(BASE_SKILLS);
     const result = applyRandomRewards(BASE_SKILLS, 5, createRng(3));
-    expect(sumStats(result)).toBeGreaterThanOrEqual(sumStats(BASE_SKILLS) + 5);
-    expect(BASE_SKILLS[1]).toEqual({ basePower: 4, coinPower: 7, coinCount: 1 });
+    expect(result).not.toEqual(BASE_SKILLS);
+    expect(JSON.stringify(BASE_SKILLS)).toBe(before);
   });
 
   it('같은 시드면 같은 결과다', () => {

@@ -6,68 +6,15 @@
 //   --seed N          기준 시드 (기본 1)
 //   --max-floor N     이 층을 클리어하면 중단 (기본 50)
 //   --policy NAME     특정 정책만 (기본: 전부)
-//
-// balance.ts를 고치지 않고 수치를 바꿔 비교해볼 수 있는 옵션:
-//   --picks N         층당 보상 선택 횟수
-//   --choices N       선택지 개수
-//   --weights A,B,C   보상 티어 가중치 (예: 60,30,10)
-//   --sanity MODE     dynamic | fixed
-//   --sanity-win N    합 승리 시 정신력 증가량
+// 수치를 바꿔 비교하는 옵션(--picks, --choices 등)은 sim/overrides.ts 참고.
 // ============================================================
 
-import { COIN, REWARD_TIER_WEIGHTS, REWARDS } from '../src/data/balance';
+import { applyOverrides, arg, describeSettings, numArg } from './overrides';
 import { POLICIES } from './policies';
 import { simulate, type SimStats } from './simulate';
 
-const argv = process.argv.slice(2);
-const arg = (name: string): string | undefined => {
-  const i = argv.indexOf(`--${name}`);
-  return i >= 0 ? argv[i + 1] : undefined;
-};
-const numArg = (name: string): number | undefined => {
-  const v = arg(name);
-  if (v === undefined) return undefined;
-  const n = Number(v);
-  if (!Number.isFinite(n)) throw new Error(`--${name} 값이 숫자가 아님: ${v}`);
-  return n;
-};
+const overrides = applyOverrides();
 
-// ---- 수치 덮어쓰기 (실행 중에만 적용, 파일은 바뀌지 않음) ----
-const overrides: string[] = [];
-const picks = numArg('picks');
-if (picks !== undefined) {
-  REWARDS.picksPerFloor = picks;
-  overrides.push(`picks=${picks}`);
-}
-const choices = numArg('choices');
-if (choices !== undefined) {
-  REWARDS.choicesPerPick = choices;
-  overrides.push(`choices=${choices}`);
-}
-const weights = arg('weights');
-if (weights !== undefined) {
-  const w = weights.split(',').map(Number);
-  if (w.length !== 3 || w.some((x) => !Number.isFinite(x) || x < 0)) {
-    throw new Error('--weights는 "60,30,10" 형식이어야 함');
-  }
-  REWARD_TIER_WEIGHTS[1] = w[0];
-  REWARD_TIER_WEIGHTS[2] = w[1];
-  REWARD_TIER_WEIGHTS[3] = w[2];
-  overrides.push(`weights=${weights}`);
-}
-const sanity = arg('sanity');
-if (sanity !== undefined) {
-  if (sanity !== 'dynamic' && sanity !== 'fixed') throw new Error('--sanity는 dynamic | fixed');
-  COIN.sanityMode = sanity;
-  overrides.push(`sanity=${sanity}`);
-}
-const sanityWin = numArg('sanity-win');
-if (sanityWin !== undefined) {
-  COIN.sanityOnClashWin = sanityWin;
-  overrides.push(`sanity-win=${sanityWin}`);
-}
-
-// ---- 실행 ----
 const runs = numArg('runs') ?? 2000;
 const seed = numArg('seed') ?? 1;
 const maxFloor = numArg('max-floor') ?? 50;
@@ -79,10 +26,7 @@ if (policies.length === 0) {
 
 console.log(`\n밸런스 시뮬레이션: 정책당 ${runs}판, 시드 ${seed}, 최대 ${maxFloor}층`);
 console.log(
-  `설정: 층당 보상 ${REWARDS.picksPerFloor}회, 선택지 ${REWARDS.choicesPerPick}개, ` +
-    `티어 가중치 ${REWARD_TIER_WEIGHTS[1]}/${REWARD_TIER_WEIGHTS[2]}/${REWARD_TIER_WEIGHTS[3]}, ` +
-    `정신력 ${COIN.sanityMode}(+${COIN.sanityOnClashWin})` +
-    (overrides.length > 0 ? `  [덮어쓴 값: ${overrides.join(', ')}]` : ''),
+  `설정: ${describeSettings()}` + (overrides.length > 0 ? `  [덮어쓴 값: ${overrides.join(', ')}]` : ''),
 );
 
 const started = Date.now();

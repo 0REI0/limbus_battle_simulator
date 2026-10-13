@@ -7,7 +7,6 @@ import {
   headsProbability,
   rollCoins,
 } from '../src/core/coins';
-import { BASE_SKILLS } from '../src/data/balance';
 import { createRng } from '../src/core/rng';
 import { fixedRng } from './helpers';
 
@@ -48,23 +47,26 @@ describe('rollCoins', () => {
 });
 
 describe('최종 위력', () => {
+  const single = { basePower: 4, coinPower: 7, coinCount: 1 };
+  const triple = { basePower: 5, coinPower: 3, coinCount: 3 };
+
   it('기본 위력 + 코인 위력 * 앞면 수', () => {
-    expect(finalPower(BASE_SKILLS[1], 0)).toBe(4);
-    expect(finalPower(BASE_SKILLS[1], 1)).toBe(11);
-    expect(finalPower(BASE_SKILLS[3], 3)).toBe(14);
+    expect(finalPower(single, 0)).toBe(4);
+    expect(finalPower(single, 1)).toBe(11);
+    expect(finalPower(triple, 3)).toBe(14);
   });
 });
 
 describe('computeHits', () => {
   it('타격마다 누적 앞면 수로 위력을 계산한다', () => {
-    // 2스킬: 기본 4, 코인 위력 4
-    const hits = computeHits(BASE_SKILLS[2], [true, false, true]);
+    // 기본 4, 코인 위력 4
+    const hits = computeHits({ basePower: 4, coinPower: 4, coinCount: 3 }, [true, false, true]);
     expect(hits.map((h) => h.headsSoFar)).toEqual([1, 1, 2]);
     expect(hits.map((h) => h.power)).toEqual([8, 8, 12]);
     expect(hits.map((h) => h.coinIndex)).toEqual([0, 1, 2]);
   });
 
   it('코인이 없으면 타격도 없다', () => {
-    expect(computeHits(BASE_SKILLS[1], [])).toEqual([]);
+    expect(computeHits({ basePower: 4, coinPower: 7, coinCount: 1 }, [])).toEqual([]);
   });
 });

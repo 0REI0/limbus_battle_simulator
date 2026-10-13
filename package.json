@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "sim": "tsx sim/balance.ts"
+    "sim": "tsx sim/balance.ts",
+    "sim:matchup": "tsx sim/matchup.ts",
+    "sim:rewards": "tsx sim/rewardValues.ts"
   },
   "dependencies": {
     "react": "^19.2.8",

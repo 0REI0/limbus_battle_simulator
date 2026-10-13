@@ -67,14 +67,20 @@ export type Coins = boolean[];
 // ------------------------------------------------------------
 
 /** 보상 티어: 높을수록 효과 크고 등장 확률 낮음 */
-export type RewardTier = 1 | 2 | 3;
+export type RewardTier = 1 | 2 | 3 | 4 | 5;
 
+/** 보상이 일으키는 변화 하나. 음수도 가능 (예: 코인 위력 -1) */
+export interface RewardEffect {
+  skillTier: SkillTier; // 어느 스킬의
+  stat: SkillStatKey; // 어느 수치를
+  amount: number; // 얼마나 바꾸는가
+}
+
+/** 하나의 보상 = 효과 1개 이상 (예: 코인 개수 +1 과 코인 위력 -1 을 동시에) */
 export interface Reward {
-  id: string; // 예: "s2-coinPower-t3"
-  skillTier: SkillTier; // 어느 스킬을 강화하는가
-  stat: SkillStatKey; // 무엇을 강화하는가
-  amount: number; // 증가량
+  id: string; // 티어와 효과 내용에서 만든 고유 문자열
   rewardTier: RewardTier;
+  effects: RewardEffect[];
 }
 
 // ------------------------------------------------------------

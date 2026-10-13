@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { applyReward } from '../src/core/rewards';
 import { advanceFloor, chooseReward, floorsCleared, startRun, type RunState } from '../src/core/run';
-import type { SkillSet } from '../src/core/types';
 import { BASE_SKILLS, REWARDS } from '../src/data/balance';
-
-const sumStats = (s: SkillSet) =>
-  ([1, 2, 3] as const).reduce(
-    (t, k) => t + s[k].basePower + s[k].coinPower + s[k].coinCount,
-    0,
-  );
 
 /** 항상 첫 번째 선택지를 고르며 게임 오버까지 진행 */
 function playToEnd(seed: number, maxSteps = 5000): RunState {
@@ -47,9 +41,7 @@ describe('chooseReward', () => {
 
     expect(s1.phase).toBe('battle');
     expect(s1.history).toEqual([picked]);
-    expect(s1.skills[picked.skillTier][picked.stat]).toBe(
-      BASE_SKILLS[picked.skillTier][picked.stat] + picked.amount,
-    );
+    expect(s1.skills).toEqual(applyReward(BASE_SKILLS, picked));
     expect(s1.enemySkills).not.toBeNull();
     expect(s1.battle).not.toBeNull();
     expect(s1.battle!.events.length).toBeGreaterThan(0);
@@ -87,8 +79,8 @@ describe('chooseReward', () => {
       s = chooseReward(s, s.choices[0].id);
       expect(s.phase).toBe('battle');
       expect(s.history).toHaveLength(3);
-      // 1층: 적도 1 * 3 = 3번의 랜덤 보상을 받음
-      expect(sumStats(s.enemySkills!)).toBeGreaterThanOrEqual(sumStats(BASE_SKILLS) + 3);
+      // 1층: 적도 1 * 3 = 3번의 랜덤 보상을 받아 기본 스펙과 달라진다
+      expect(s.enemySkills).not.toEqual(BASE_SKILLS);
     } finally {
       REWARDS.picksPerFloor = original;
     }

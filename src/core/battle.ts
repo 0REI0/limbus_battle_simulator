@@ -12,12 +12,7 @@
 //      MAX_TURNS_PER_BATTLE 안에 끝나지 않으면 플레이어 패배 (목표 턴 제한)
 // ============================================================
 
-import {
-  COIN,
-  MAX_CLASH_ROUNDS,
-  MAX_TURNS_PER_BATTLE,
-  maxHpForFloor,
-} from '../data/balance';
+import { COIN, MAX_CLASH_ROUNDS, MAX_TURNS_PER_BATTLE, maxHpForFloor } from '../data/balance';
 import { clampSanity, computeHits, countHeads, finalPower, rollCoins } from './coins';
 import { createDeck, drawSkill } from './skillDeck';
 import type {

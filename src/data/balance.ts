@@ -2,7 +2,7 @@
 // data/balance.ts - 밸런스 수치는 전부 여기서만 관리한다.
 // ============================================================
 
-import type { RewardTier, SkillSet, SkillStatKey, SkillTier } from '../core/types';
+import type { RewardEffect, RewardTier, SkillSet, SkillTier } from '../core/types';
 
 // ------------------------------------------------------------
 // 기본 스펙
@@ -10,8 +10,8 @@ import type { RewardTier, SkillSet, SkillStatKey, SkillTier } from '../core/type
 
 export const BASE_SKILLS: SkillSet = {
   1: { basePower: 4, coinPower: 7, coinCount: 1 },
-  2: { basePower: 4, coinPower: 4, coinCount: 2 },
-  3: { basePower: 5, coinPower: 3, coinCount: 3 },
+  2: { basePower: 4, coinPower: 5, coinCount: 2 },
+  3: { basePower: 6, coinPower: 4, coinCount: 2 },
 };
 
 /** 층별 최대 체력: 100 + 층수 * 10. 플레이어/적 공통, 보상으로 변하지 않음 */
@@ -49,40 +49,75 @@ export const COIN = {
 
 // ------------------------------------------------------------
 // 보상
+//
+// 보상 티어(1~5)마다 보상 목록을 가진다. 보상 하나 = 효과(RewardEffect) 목록.
+// 효과 하나 = (스킬 종류, 스탯 종류, 변동 수치). 변동 수치는 음수도 가능.
+// 감소 효과로 스탯이 아래 한계(기본/코인 위력 0, 코인 개수 1)보다 내려가면 한계로 맞춘다.
 // ------------------------------------------------------------
 
-/**
- * 보상 증가량 표. 배열 인덱스 0/1/2 = 보상 티어 1/2/3.
- * null = 해당 티어에서는 등장하지 않음
- */
-export type RewardAmountTable = Record<
-  SkillTier,
-  Record<SkillStatKey, readonly (number | null)[]>
->;
+export const REWARD_TIERS: readonly RewardTier[] = [1, 2, 3, 4, 5];
 
-export const REWARD_TABLE: RewardAmountTable = {
-  1: {
-    basePower: [1, 2, null],
-    coinPower: [null, null, 1],
-    coinCount: [null, null, 1],
-  },
-  2: {
-    basePower: [2, 3, null],
-    coinPower: [null, 1, 2],
-    coinCount: [null, null, 1],
-  },
-  3: {
-    basePower: [3, 4, null],
-    coinPower: [null, 1, 2],
-    coinCount: [null, 1, 1],
-  },
+// 표를 읽기 쉽게 만드는 도우미
+const base = (skill: SkillTier, amount: number): RewardEffect => ({ skillTier: skill, stat: 'basePower', amount });
+const power = (skill: SkillTier, amount: number): RewardEffect => ({ skillTier: skill, stat: 'coinPower', amount });
+const count = (skill: SkillTier, amount: number): RewardEffect => ({ skillTier: skill, stat: 'coinCount', amount });
+
+/**
+ * 티어별 보상 목록. 보상 하나 = 효과들의 배열.
+ * [초안] 보상 가치를 계산하는 도구(npm run sim:rewards)의 "net"(합 승률 변화까지 반영한 순이득)을
+ * 참고해 비슷한 보상끼리 한 티어로 묶은 것이다. 기본 스펙/규칙을 바꾸면 가치가 달라지므로
+ * 그때마다 도구를 다시 돌려 티어를 조정한다. 값은 기본 스펙 기준이라, 강화가 쌓이면 실제 가치는 달라진다.
+ */
+export const REWARD_TABLE: Record<RewardTier, RewardEffect[][]> = {
+  1: [
+    [power(1, 3)],
+    [base(3, 1)],
+    [power(2, 1)],
+    [base(1, 1)],
+    [power(3, 2)],
+  ],
+  2: [
+    [count(2, 1), power(2, -2)],
+    [base(3, 2)],
+    [power(1, 4)],
+    [power(3, 3)],
+    [base(2, 1)],
+    [base(1, 2)],
+  ],
+  3: [
+    [count(3, 1), base(3, 1), power(3, -2)],
+    [count(3, 1), power(3, -1)],
+    [power(3, 4)],
+    [base(3, 3)],
+    [base(1, 3)],
+    [power(2, 2)],
+  ],
+  4: [
+    [count(1, 1), power(1, -2)],
+    [count(2, 1), power(2, -1)],
+    [base(1, 4)],
+    [count(2, 1), base(2, 1), power(2, -2)],
+    [power(2, 3)],
+    [base(3, 4)],
+    [base(2, 2)],
+  ],
+  5: [
+    [base(2, 3)],
+    [base(3, 5)],
+    [base(2, 4)],
+    [base(3, 6)],
+    [base(1, 5)],
+    [count(1, 1), power(1, -1)],
+  ],
 };
 
 /** 보상 티어 등장 가중치 (높은 티어일수록 낮음). 시뮬레이션으로 조정 */
 export const REWARD_TIER_WEIGHTS: Record<RewardTier, number> = {
-  1: 60,
-  2: 30,
-  3: 10,
+  1: 40,
+  2: 28,
+  3: 18,
+  4: 10,
+  5: 4,
 };
 
 export const REWARDS = {

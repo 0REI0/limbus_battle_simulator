@@ -7,8 +7,9 @@
 
 import { applyReward } from '../src/core/rewards';
 import type { RunState } from '../src/core/run';
-import type { Reward, Rng, SkillSet, SkillStatKey } from '../src/core/types';
-import { DECK_COMPOSITION } from '../src/data/balance';
+import type { Reward, Rng, SkillSet, SkillStatKey, SkillTier } from '../src/core/types';
+import { BASE_SKILLS, DECK_COMPOSITION } from '../src/data/balance';
+import { turnExpectation } from './analysis';
 
 export interface Policy {
   name: string;
@@ -34,9 +35,9 @@ function pickBest(choices: readonly Reward[], score: (r: Reward) => number, rng:
 }
 
 /**
- * 스킬 사용 1회당 기대 데미지 (정신력 0, 앞면 확률 50% 가정) 를 묶음 구성 비율로 가중 평균.
+ * 스킬 6번 사용(= 묶음 한 사이클) 동안의 기대 데미지 합계 (정신력 0, 앞면 확률 50% 가정).
  * i번째 타격 위력 = 기본 + 코인 위력 * (평균 앞면 수 = 0.5 * i)
- * 합에서의 유불리는 고려하지 않는 단순 지표.
+ * 합에서의 유불리는 고려하지 않는 단순 지표 (합 반영 지표는 analysis.ts의 turnExpectation).
  */
 export function expectedDamage(skills: SkillSet): number {
   let total = 0;
@@ -50,6 +51,13 @@ export function expectedDamage(skills: SkillSet): number {
 
 const STAT_RANK: Record<SkillStatKey, number> = { basePower: 0, coinPower: 1, coinCount: 2 };
 
+const touches = (r: Reward, tier: SkillTier) => r.effects.some((e) => e.skillTier === tier);
+/** 증가시키는 수치들의 합 (감소 효과는 제외) */
+const gainSum = (r: Reward) => r.effects.reduce((sum, e) => sum + Math.max(0, e.amount), 0);
+/** 증가시키는 스탯 중 가장 "높은" 종류 (코인 개수 > 코인 위력 > 기본 위력) */
+const topStatRank = (r: Reward) =>
+  Math.max(-1, ...r.effects.filter((e) => e.amount > 0).map((e) => STAT_RANK[e.stat]));
+
 export const POLICIES: Policy[] = [
   {
     name: 'random',
@@ -57,27 +65,27 @@ export const POLICIES: Policy[] = [
     pick: (state, rng) => pickBest(state.choices, () => 0, rng),
   },
   {
-    name: 'maxAmount',
-    description: '증가량 숫자가 가장 큰 보상',
-    pick: (state, rng) => pickBest(state.choices, (r) => r.amount, rng),
+    name: 'highTier',
+    description: '보상 티어가 높은 것 우선 (같은 티어끼리는 무작위)',
+    pick: (state, rng) => pickBest(state.choices, (r) => r.rewardTier, rng),
   },
   {
     name: 'skill1',
     description: '1스킬 강화 우선',
     pick: (state, rng) =>
-      pickBest(state.choices, (r) => (r.skillTier === 1 ? 1000 : 0) + r.amount, rng),
+      pickBest(state.choices, (r) => (touches(r, 1) ? 1000 : 0) + gainSum(r), rng),
   },
   {
     name: 'skill3',
     description: '3스킬 강화 우선',
     pick: (state, rng) =>
-      pickBest(state.choices, (r) => (r.skillTier === 3 ? 1000 : 0) + r.amount, rng),
+      pickBest(state.choices, (r) => (touches(r, 3) ? 1000 : 0) + gainSum(r), rng),
   },
   {
     name: 'coinCount',
     description: '코인 개수 > 코인 위력 > 기본 위력 순으로 우선',
     pick: (state, rng) =>
-      pickBest(state.choices, (r) => STAT_RANK[r.stat] * 1000 + r.amount, rng),
+      pickBest(state.choices, (r) => topStatRank(r) * 1000 + gainSum(r), rng),
   },
   {
     name: 'greedyDmg',
@@ -86,6 +94,16 @@ export const POLICIES: Policy[] = [
       pickBest(
         state.choices,
         (r) => expectedDamage(applyReward(state.skills, r)) - expectedDamage(state.skills),
+        rng,
+      ),
+  },
+  {
+    name: 'greedyNet',
+    description: '합 승률 변화까지 반영한 순이득(net)이 가장 많이 오르는 보상',
+    pick: (state, rng) =>
+      pickBest(
+        state.choices,
+        (r) => turnExpectation(applyReward(state.skills, r), BASE_SKILLS).net,
         rng,
       ),
   },
