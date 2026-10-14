@@ -57,6 +57,23 @@ describe('최종 위력', () => {
   });
 });
 
+describe('마이너스 코인 위력', () => {
+  const negative = { basePower: 3, coinPower: -2, coinCount: 3 };
+
+  it('앞면이 나올수록 위력이 줄고, 0 아래로는 내려가지 않는다', () => {
+    expect(finalPower(negative, 0)).toBe(3);
+    expect(finalPower(negative, 1)).toBe(1);
+    expect(finalPower(negative, 2)).toBe(0); // 3 - 4 = -1 → 0
+    expect(finalPower(negative, 3)).toBe(0); // 3 - 6 = -3 → 0
+  });
+
+  it('타격 위력도 0 아래로 내려가지 않는다 (음수 데미지로 회복하지 않는다)', () => {
+    const hits = computeHits(negative, [true, true, true]);
+    expect(hits.map((h) => h.power)).toEqual([1, 0, 0]);
+    expect(hits.every((h) => h.power >= 0)).toBe(true);
+  });
+});
+
 describe('computeHits', () => {
   it('타격마다 누적 앞면 수로 위력을 계산한다', () => {
     // 기본 4, 코인 위력 4

@@ -32,7 +32,7 @@ export interface Rng {
 /** 스킬 하나의 스펙 */
 export interface SkillStats {
   basePower: number; // 기본 위력
-  coinPower: number; // 코인 위력
+  coinPower: number; // 코인 위력 (음수 가능: 마이너스 코인)
   coinCount: number; // 코인 개수
 }
 export type SkillStatKey = keyof SkillStats;

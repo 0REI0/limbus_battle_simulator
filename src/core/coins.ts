@@ -29,9 +29,12 @@ export function countHeads(coins: Coins): number {
   return coins.filter(Boolean).length;
 }
 
-/** 최종 위력 = 기본 위력 + 코인 위력 * 앞면 개수 */
+/**
+ * 최종 위력 = 기본 위력 + 코인 위력 * 앞면 개수.
+ * 코인 위력이 음수(마이너스 코인)여도 위력이 0 아래로 내려가지는 않는다 (음수 데미지로 회복되는 것을 막는다).
+ */
 export function finalPower(skill: SkillStats, heads: number): number {
-  return skill.basePower + skill.coinPower * heads;
+  return Math.max(0, skill.basePower + skill.coinPower * heads);
 }
 
 /**

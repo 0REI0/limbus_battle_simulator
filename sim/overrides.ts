@@ -9,7 +9,8 @@
 //   --sanity MODE      dynamic | fixed
 //   --sanity-win N     합 승리 시 정신력 증가량
 //   --enemy MODE       적의 보상 획득 방식: random | rank
-//   --enemy-rank N     rank 모드에서 몇 번째로 좋은 선택지를 고르는가 (1 = 가장 좋은 것, 2 = 두 번째)
+//   --enemy-ranks A,B,C  rank 모드에서 순위별로 고를 가중치 (예: 60,30,10 = 1순위 60%, 2순위 30%, 3순위 10%)
+//   --enemy-rank N     위의 간단 버전: N순위만 항상 고른다 (예: 2 = 항상 두 번째로 좋은 선택지)
 // ============================================================
 
 import { COIN, ENEMY, REWARD_TIERS, REWARD_TIER_WEIGHTS, REWARDS } from '../src/data/balance';
@@ -79,13 +80,32 @@ export function applyOverrides(): string[] {
     ENEMY.pickMode = enemy;
     applied.push(`enemy=${enemy}`);
   }
+  const enemyRanks = arg('enemy-ranks');
+  if (enemyRanks !== undefined) {
+    const weights = enemyRanks.split(',').map(Number);
+    if (weights.length === 0 || weights.some((w) => !Number.isFinite(w) || w < 0) || weights.every((w) => w === 0)) {
+      throw new Error('--enemy-ranks는 "60,30,10"처럼 0 이상의 숫자를 쉼표로 구분 (전부 0은 불가)');
+    }
+    ENEMY.rankWeights = weights;
+    applied.push(`enemy-ranks=${weights.join(',')}`);
+  }
   const enemyRank = numArg('enemy-rank');
   if (enemyRank !== undefined) {
     if (!Number.isInteger(enemyRank) || enemyRank < 1) throw new Error('--enemy-rank는 1 이상의 정수');
-    ENEMY.pickRank = enemyRank;
+    ENEMY.rankWeights = Array.from({ length: enemyRank }, (_, i) => (i === enemyRank - 1 ? 1 : 0));
     applied.push(`enemy-rank=${enemyRank}`);
   }
   return applied;
+}
+
+/** 순위별 가중치를 확률로 환산해 읽기 쉽게 (예: "선택지 순위 1위 60%, 2위 30%, 3위 10%") */
+function describeRankWeights(weights: readonly number[]): string {
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  const parts = weights
+    .map((w, i) => ({ rank: i + 1, percent: total > 0 ? (w / total) * 100 : 0 }))
+    .filter((x) => x.percent > 0)
+    .map((x) => `${x.rank}위 ${Number(x.percent.toFixed(1))}%`);
+  return `선택지 순위 ${parts.join(', ')}`;
 }
 
 /** 현재 설정을 한 줄로 요약 (출력 머리말용) */
@@ -94,6 +114,6 @@ export function describeSettings(): string {
     `층당 보상 ${REWARDS.picksPerFloor}회, 선택지 ${REWARDS.choicesPerPick}개, ` +
     `티어 가중치 ${REWARD_TIERS.map((t) => REWARD_TIER_WEIGHTS[t]).join('/')}, ` +
     `정신력 ${COIN.sanityMode}(+${COIN.sanityOnClashWin}), ` +
-    `적 보상 ${ENEMY.pickMode === 'random' ? '무작위' : `선택지 중 ${ENEMY.pickRank}번째로 좋은 것`}`
+    `적 보상 ${ENEMY.pickMode === 'random' ? '무작위' : describeRankWeights(ENEMY.rankWeights)}`
   );
 }

@@ -14,7 +14,7 @@ import type {
   Side,
   SkillTier,
 } from '../core/types';
-import { COIN, MAX_TURNS_PER_BATTLE } from '../data/balance';
+import { COIN } from '../data/balance';
 
 /** ready: 전투 시작 전 / skills: 스킬 공개 / clash: 합 진행 / clashEnd: 합 결과 / stalemate: 합 무승부 / attack: 공격 / end: 종료 */
 export type Stage = 'ready' | 'skills' | 'clash' | 'clashEnd' | 'stalemate' | 'attack' | 'end';
@@ -73,8 +73,8 @@ export const DELAY = {
 } as const;
 
 export const opposite = (side: Side): Side => (side === 'player' ? 'enemy' : 'player');
-const subject = (side: Side) => (side === 'player' ? '내가' : '적이');
-const owner = (side: Side) => (side === 'player' ? '내' : '적');
+const subject = (side: Side) => (side === 'player' ? '플레이어가' : '적이');
+const owner = (side: Side) => (side === 'player' ? '플레이어' : '적');
 
 export function initialView(maxHp: number, initialSanity: number = COIN.initialSanity): BattleView {
   return {
@@ -115,14 +115,14 @@ export function buildFrames(events: readonly BattleEvent[], maxHp: number): Fram
             clashWinner: null,
             attack: null,
           },
-          `${e.turn}턴: 내 ${e.playerTier}스킬, 적 ${e.enemyTier}스킬`,
+          `${e.turn}턴: 플레이어 ${e.playerTier}스킬, 적 ${e.enemyTier}스킬`,
           DELAY.skills,
         );
         break;
 
       case 'clashRound': {
         const verdict =
-          e.result === 'draw' ? '무승부라 코인은 그대로입니다.' : `${subject(e.result)} 우세해서 상대 코인이 1개 줄었습니다.`;
+          e.result === 'draw' ? '무승부' : `${subject(e.result)} 우세`;
         push(
           {
             ...view,
@@ -130,7 +130,7 @@ export function buildFrames(events: readonly BattleEvent[], maxHp: number): Fram
             coinsLeft: { player: e.player.coinCountAfter, enemy: e.enemy.coinCountAfter },
             clash: { round: e.round, player: e.player, enemy: e.enemy, result: e.result },
           },
-          `합 ${e.round}라운드: 나 위력 ${e.player.power}(앞면 ${e.player.heads}/${e.player.coins.length}), ` +
+          `${e.round}합: 플레이어 위력 ${e.player.power}(앞면 ${e.player.heads}/${e.player.coins.length}), ` +
             `적 위력 ${e.enemy.power}(앞면 ${e.enemy.heads}/${e.enemy.coins.length}). ${verdict}`,
           DELAY.clashRound,
         );
@@ -140,7 +140,7 @@ export function buildFrames(events: readonly BattleEvent[], maxHp: number): Fram
       case 'clashStalemate':
         push(
           { ...view, stage: 'stalemate' },
-          `합이 ${e.rounds}라운드까지 끝나지 않아 무승부로 처리합니다. 이번 턴은 공격 없이 넘어갑니다.`,
+          `합 종료: 합 제한 초과, 무승부`,
           DELAY.stalemate,
         );
         break;
@@ -148,7 +148,7 @@ export function buildFrames(events: readonly BattleEvent[], maxHp: number): Fram
       case 'clashEnd':
         push(
           { ...view, stage: 'clashEnd', clashWinner: e.winner },
-          `합 종료: ${subject(e.winner)} 이겼습니다. 코인 ${e.remainingCoins}개가 남았습니다.`,
+          `합 종료: ${subject(e.winner)} 승리, 남은 코인 ${e.remainingCoins}개`,
           DELAY.clashEnd,
         );
         break;
@@ -170,6 +170,13 @@ export function buildFrames(events: readonly BattleEvent[], maxHp: number): Fram
           `${owner(e.attacker)} ${e.tier}스킬 공격: 코인 ${coins.length}개`,
           DELAY.attackStart,
         );
+        // 공격 로그는 타격이 모두 공개된 마지막 프레임에 한 줄로 남긴다.
+        // 예: "데미지 : 20 (4+4+4+8) (처치)"
+        const powers = e.hits.map((hit) => hit.power);
+        const killed = e.hits[e.hits.length - 1]?.targetHpAfter === 0;
+        const summary =
+          `데미지 : ${powers.reduce((sum, p) => sum + p, 0)} (${powers.join('+')})` +
+          (killed ? ' (처치)' : '');
         e.hits.forEach((hit, i) => {
           push(
             {
@@ -177,7 +184,7 @@ export function buildFrames(events: readonly BattleEvent[], maxHp: number): Fram
               hp: { ...view.hp, [target]: hit.targetHpAfter },
               attack: { ...base, shown: i + 1, lastHit: hit },
             },
-            `${i + 1}번째 타격: 위력 ${hit.power}${hit.targetHpAfter === 0 ? '. 쓰러뜨렸습니다.' : ''}`,
+            i === e.hits.length - 1 ? summary : null,
             DELAY.hit,
           );
         });
@@ -187,10 +194,10 @@ export function buildFrames(events: readonly BattleEvent[], maxHp: number): Fram
       case 'battleEnd': {
         const log =
           e.reason === 'turnLimit'
-            ? `제한 턴(${MAX_TURNS_PER_BATTLE}턴) 안에 처치하지 못해 패배했습니다.`
+            ? `OVER CLOCK`
             : e.winner === 'player'
-              ? '전투에서 승리했습니다.'
-              : '쓰러졌습니다.';
+              ? '전투 승리'
+              : '전투 패배';
         push(
           { ...view, stage: 'end', end: { winner: e.winner, reason: e.reason, turns: e.turns } },
           log,

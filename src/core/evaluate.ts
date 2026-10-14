@@ -29,9 +29,9 @@ function roundOdds(sa: SkillStats, a: number, sb: SkillStats, b: number, p: numb
   let aWin = 0;
   let bWin = 0;
   for (let ha = 0; ha <= a; ha++) {
-    const powA = sa.basePower + sa.coinPower * ha;
+    const powA = Math.max(0, sa.basePower + sa.coinPower * ha); // 최종 위력은 0 미만이 되지 않는다 (coins.ts의 finalPower와 같은 규칙)
     for (let hb = 0; hb <= b; hb++) {
-      const powB = sb.basePower + sb.coinPower * hb;
+      const powB = Math.max(0, sb.basePower + sb.coinPower * hb);
       if (powA > powB) aWin += pa[ha] * pb[hb];
       else if (powA < powB) bWin += pa[ha] * pb[hb];
     }
@@ -88,9 +88,20 @@ export function winnerHeadsProb(): number {
   return (COIN.baseHeadsPercent + sanity) / 100;
 }
 
-/** 코인 r개로 공격할 때의 기대 데미지 (처치로 인한 중단 무시) */
+/**
+ * 코인 r개로 공격할 때의 기대 데미지 (처치로 인한 중단 무시).
+ * i번째 타격 위력 = max(0, 기본 + 코인 위력 * (처음 i개 코인 중 앞면 수)). 앞면 수는 이항분포를 따른다.
+ * 위력이 0에서 잘리는 경우(마이너스 코인)까지 정확히 계산하려고 앞면 수별 확률을 모두 더한다.
+ */
 export function expectedAttackDamage(skill: SkillStats, r: number, headsProb: number): number {
-  return r * skill.basePower + skill.coinPower * headsProb * ((r * (r + 1)) / 2);
+  let total = 0;
+  for (let i = 1; i <= r; i++) {
+    const pmf = binomialPmf(i, headsProb);
+    for (let heads = 0; heads <= i; heads++) {
+      total += pmf[heads] * Math.max(0, skill.basePower + skill.coinPower * heads);
+    }
+  }
+  return total;
 }
 
 export interface Matchup {

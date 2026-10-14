@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { runBattle } from '../src/core/battle';
+import { createRng } from '../src/core/rng';
 import { chooseReward, startRun } from '../src/core/run';
 import { DELAY } from '../src/ui/playback';
 import App from '../src/ui/App';
 import { BattleScreen } from '../src/ui/screens/BattleScreen';
 import { loadBest } from '../src/ui/storage';
+import { makeCombatant, uniformSkills } from './helpers';
 
 beforeEach(() => {
   window.scrollTo = vi.fn();
@@ -101,7 +104,7 @@ describe('전투 재생 (가짜 타이머)', () => {
       <BattleScreen
         floor={state.floor}
         skills={state.skills}
-        enemySkills={state.enemySkills!}
+        enemySkills={state.enemySkills}
         battle={state.battle!}
         onContinue={() => {}}
       />
@@ -151,5 +154,32 @@ describe('전투 재생 (가짜 타이머)', () => {
     expect(lines.length).toBeGreaterThan(3);
     expect(lines[0]).toContain('1턴');
     expect(lines[lines.length - 1]).toMatch(/승리|쓰러졌습니다|패배/);
+  });
+});
+
+describe('마이너스 코인 위력 표시', () => {
+  it('합 계산식에 부호가 바르게 표시되고, 스킬 스펙에도 "+-"가 나오지 않는다', () => {
+    vi.useFakeTimers();
+    const negative = uniformSkills({ basePower: 3, coinPower: -2, coinCount: 3 });
+    const steady = uniformSkills({ basePower: 1, coinPower: 0, coinCount: 1 });
+    const battle = runBattle(makeCombatant(negative, 50), makeCombatant(steady, 50), createRng(1));
+
+    render(
+      <BattleScreen floor={1} skills={negative} enemySkills={steady} battle={battle} onContinue={() => {}} />,
+    );
+    // 전투 시작(ready) → 스킬 공개(skills) → 첫 합(clash) 프레임까지 진행.
+    // act 한 번에 프레임이 하나씩만 넘어가므로 프레임마다 따로 진행한다
+    act(() => {
+      vi.advanceTimersByTime(DELAY.ready);
+    });
+    act(() => {
+      vi.advanceTimersByTime(DELAY.skills);
+    });
+
+    expect(screen.getAllByText(/3 \u2212 2×\d/).length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toContain('+-');
+    expect(document.body.textContent).not.toContain('+\u2212');
+    // 스킬 스펙 표기: 코인 −2
+    expect(document.body.textContent).toContain('코인 \u22122');
   });
 });

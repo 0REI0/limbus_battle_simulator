@@ -159,7 +159,7 @@ describe('applyReward', () => {
     expect(BASE_SKILLS).toEqual(BASE);
   });
 
-  it('감소 효과는 한계 밑으로 내려가지 않는다 (기본/코인 위력 0, 코인 개수 1)', () => {
+  it('기본 위력은 0, 코인 개수는 1 밑으로 내려가지 않지만, 코인 위력은 음수가 될 수 있다', () => {
     const result = applyReward(
       BASE_SKILLS,
       reward([
@@ -168,7 +168,17 @@ describe('applyReward', () => {
         { skillTier: 1, stat: 'coinCount', amount: -100 },
       ]),
     );
-    expect(result[1]).toEqual({ basePower: 0, coinPower: 0, coinCount: 1 });
+    expect(result[1].basePower).toBe(0);
+    expect(result[1].coinCount).toBe(1);
+    expect(result[1].coinPower).toBe(BASE_SKILLS[1].coinPower - 100); // 마이너스 코인
+  });
+
+  it('코인 위력을 0 밑으로 반복해서 내릴 수 있다', () => {
+    const down = reward([{ skillTier: 3, stat: 'coinPower', amount: -2 }]);
+    let skills = BASE_SKILLS;
+    for (let i = 0; i < 4; i++) skills = applyReward(skills, down);
+    expect(skills[3].coinPower).toBe(BASE_SKILLS[3].coinPower - 8);
+    expect(skills[3].coinPower).toBeLessThan(0);
   });
 });
 

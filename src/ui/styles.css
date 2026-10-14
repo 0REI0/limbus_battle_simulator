@@ -83,6 +83,10 @@ button {
   flex: 1;
 }
 
+.fan-note p + p {
+  margin-top: 0.3rem;
+}
+
 .fan-note {
   max-width: 40rem;
   margin: 0 auto;
@@ -329,6 +333,11 @@ button {
   padding: 1rem 1.1rem;
   background: var(--bg-raised);
   border: 1px solid var(--line);
+}
+
+.panel--enemy {
+  margin-top: 0.75rem;
+  border-left: 5px solid var(--rose);
 }
 
 .panel__title {

@@ -221,3 +221,32 @@ describe('전투 제한', () => {
     expect(result.events.filter((e) => e.type === 'attack')).toHaveLength(MAX_TURNS_PER_BATTLE);
   });
 });
+
+describe('마이너스 코인 위력', () => {
+  it('위력이 0 아래로 내려가지 않아 타격이 상대를 회복시키지 않는다', () => {
+    const negative = uniformSkills({ basePower: 2, coinPower: -3, coinCount: 3 });
+    const steady = uniformSkills({ basePower: 1, coinPower: 0, coinCount: 1 });
+    for (let seed = 1; seed <= 60; seed++) {
+      const result = runBattle(
+        makeCombatant(negative, 60),
+        makeCombatant(steady, 60),
+        createRng(seed),
+      );
+      let hp = { player: 60, enemy: 60 };
+      for (const e of result.events) {
+        if (e.type === 'clashRound') {
+          expect(e.player.power).toBeGreaterThanOrEqual(0);
+          expect(e.enemy.power).toBeGreaterThanOrEqual(0);
+        }
+        if (e.type === 'attack') {
+          const target = e.attacker === 'player' ? 'enemy' : 'player';
+          for (const hit of e.hits) {
+            expect(hit.power).toBeGreaterThanOrEqual(0);
+            expect(hit.targetHpAfter).toBeLessThanOrEqual(hp[target]); // 체력이 늘어나지 않는다
+            hp = { ...hp, [target]: hit.targetHpAfter };
+          }
+        }
+      }
+    }
+  });
+});

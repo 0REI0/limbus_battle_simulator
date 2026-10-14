@@ -9,7 +9,7 @@ import { applyReward } from '../src/core/rewards';
 import type { RunState } from '../src/core/run';
 import type { Reward, Rng, SkillSet, SkillStatKey, SkillTier } from '../src/core/types';
 import { BASE_SKILLS, DECK_COMPOSITION } from '../src/data/balance';
-import { turnExpectation } from '../src/core/evaluate';
+import { expectedAttackDamage, turnExpectation } from '../src/core/evaluate';
 
 export interface Policy {
   name: string;
@@ -36,15 +36,13 @@ function pickBest(choices: readonly Reward[], score: (r: Reward) => number, rng:
 
 /**
  * 스킬 6번 사용(= 묶음 한 사이클) 동안의 기대 데미지 합계 (정신력 0, 앞면 확률 50% 가정).
- * i번째 타격 위력 = 기본 + 코인 위력 * (평균 앞면 수 = 0.5 * i)
- * 합에서의 유불리는 고려하지 않는 단순 지표 (합 반영 지표는 analysis.ts의 turnExpectation).
+ * 마이너스 코인으로 위력이 0에서 잘리는 경우까지 반영한다 (core/evaluate.ts의 expectedAttackDamage).
+ * 합에서의 유불리는 고려하지 않는 단순 지표 (합 반영 지표는 core/evaluate.ts의 turnExpectation).
  */
 export function expectedDamage(skills: SkillSet): number {
   let total = 0;
   for (const tier of [1, 2, 3] as const) {
-    const { basePower, coinPower, coinCount } = skills[tier];
-    const damage = coinCount * basePower + 0.5 * coinPower * ((coinCount * (coinCount + 1)) / 2);
-    total += DECK_COMPOSITION[tier] * damage;
+    total += DECK_COMPOSITION[tier] * expectedAttackDamage(skills[tier], skills[tier].coinCount, 0.5);
   }
   return total;
 }

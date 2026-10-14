@@ -1,4 +1,5 @@
 import { SKILL_TIERS, type SkillSet, type SkillStats } from '../../core/types';
+import { formatDelta } from '../format';
 import { CoinPips } from './Coin';
 
 /** 스킬 한 줄 스펙: 기본 위력, 코인 위력, 코인 개수 */
@@ -9,20 +10,26 @@ export function SkillSpec({ stats }: { stats: SkillStats }) {
         기본 <b>{stats.basePower}</b>
       </span>
       <span className="spec__item">
-        코인 <b>+{stats.coinPower}</b>
+        코인 <b>{formatDelta(stats.coinPower)}</b>
       </span>
       <CoinPips count={stats.coinCount} />
     </span>
   );
 }
 
-function Changed({ before, after, prefix = '' }: { before: number; after: number; prefix?: string }) {
-  if (before === after) return <b>{prefix}{after}</b>;
+function Changed({
+  before,
+  after,
+  format = String,
+}: {
+  before: number;
+  after: number;
+  format?: (n: number) => string;
+}) {
+  if (before === after) return <b>{format(after)}</b>;
   return (
     <b className="spec__changed">
-      {prefix}
-      {before}→{prefix}
-      {after}
+      {format(before)}→{format(after)}
     </b>
   );
 }
@@ -35,7 +42,7 @@ export function SpecDiff({ before, after }: { before: SkillStats; after: SkillSt
         기본 <Changed before={before.basePower} after={after.basePower} />
       </span>
       <span className="spec__item">
-        코인 <Changed before={before.coinPower} after={after.coinPower} prefix="+" />
+        코인 <Changed before={before.coinPower} after={after.coinPower} format={formatDelta} />
       </span>
       <span className="spec__item">
         개수 <Changed before={before.coinCount} after={after.coinCount} />

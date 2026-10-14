@@ -25,11 +25,34 @@ describe('startRun', () => {
     expect(s.picksLeft).toBe(REWARDS.picksPerFloor);
     expect(s.choices).toHaveLength(REWARDS.choicesPerPick);
     expect(s.battle).toBeNull();
-    expect(s.enemySkills).toBeNull();
+    // 적 스펙은 층이 시작될 때 이미 정해져 있다 (1층 적은 보상 1개를 받은 상태)
+    expect(s.enemySkills).not.toEqual(BASE_SKILLS);
   });
 
   it('같은 시드면 같은 선택지가 나온다', () => {
     expect(startRun(42)).toEqual(startRun(42));
+  });
+});
+
+describe('적 스펙의 공개 시점', () => {
+  it('보상을 고르기 전에 이미 정해져 있고, 어떤 보상을 골라도 같은 적이 나온다', () => {
+    const s0 = startRun(5);
+    for (const choice of s0.choices) {
+      const afterPick = chooseReward(s0, choice.id);
+      expect(afterPick.enemySkills).toEqual(s0.enemySkills);
+    }
+  });
+
+  it('같은 시드면 같은 적이고, 다음 층으로 넘어갈 때도 보상 선택 전에 정해진다', () => {
+    expect(startRun(9).enemySkills).toEqual(startRun(9).enemySkills);
+
+    const fought = chooseReward(startRun(9), startRun(9).choices[0].id);
+    const won: RunState = { ...fought, battle: { ...fought.battle!, winner: 'player' } };
+    const next = advanceFloor(won);
+    expect(next.phase).toBe('reward'); // 아직 보상을 고르기 전
+    expect(next.enemySkills).not.toEqual(BASE_SKILLS);
+    // 보상을 고른 뒤에도 그대로
+    expect(chooseReward(next, next.choices[0].id).enemySkills).toEqual(next.enemySkills);
   });
 });
 
@@ -42,7 +65,7 @@ describe('chooseReward', () => {
     expect(s1.phase).toBe('battle');
     expect(s1.history).toEqual([picked]);
     expect(s1.skills).toEqual(applyReward(BASE_SKILLS, picked));
-    expect(s1.enemySkills).not.toBeNull();
+    expect(s1.enemySkills).toEqual(s0.enemySkills); // 플레이어의 선택과 상관없이 같은 적
     expect(s1.battle).not.toBeNull();
     expect(s1.battle!.events.length).toBeGreaterThan(0);
     expect(s1.choices).toEqual([]);
@@ -99,7 +122,7 @@ describe('advanceFloor', () => {
     expect(next.picksLeft).toBe(REWARDS.picksPerFloor);
     expect(next.choices).toHaveLength(REWARDS.choicesPerPick);
     expect(next.battle).toBeNull();
-    expect(next.enemySkills).toBeNull();
+    expect(next.enemySkills).not.toEqual(won.enemySkills); // 새 층의 새 적
     expect(next.skills).toEqual(won.skills); // 강화는 유지
     expect(next.history).toEqual(won.history);
   });
@@ -158,7 +181,7 @@ describe('한 판 전체', () => {
   it("적이 선택지를 고르는 'rank' 모드에서도 한 판이 끝까지 진행되고 재현된다", () => {
     const original = { ...ENEMY };
     ENEMY.pickMode = 'rank';
-    ENEMY.pickRank = 2;
+    ENEMY.rankWeights = [60, 30, 10];
     try {
       for (let seed = 1; seed <= 20; seed++) {
         const end = playToEnd(seed);

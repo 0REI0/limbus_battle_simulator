@@ -3,7 +3,14 @@ import { createRng } from '../src/core/rng';
 import { COIN } from '../src/data/balance';
 import { runBattle } from '../src/core/battle';
 import type { SkillSet, SkillStats, SkillTier } from '../src/core/types';
-import { clashDistribution, computeMatchup, skillSetValue, sum, turnExpectation } from '../src/core/evaluate';
+import {
+  clashDistribution,
+  computeMatchup,
+  expectedAttackDamage,
+  skillSetValue,
+  sum,
+  turnExpectation,
+} from '../src/core/evaluate';
 import { makeCombatant } from './helpers';
 
 const stat = (basePower: number, coinPower: number, coinCount: number): SkillStats => ({
@@ -31,6 +38,46 @@ describe('clashDistribution (정확한 합 확률)', () => {
   it('모든 경우의 확률 합은 1이다', () => {
     const dist = clashDistribution(stat(4, 5, 2), stat(6, 4, 2), 0.5);
     expect(sum(dist.a) + sum(dist.b)).toBeCloseTo(1);
+  });
+});
+
+describe('expectedAttackDamage (마이너스 코인 포함)', () => {
+  it('코인 위력이 양수면 기존 닫힌 식과 같다', () => {
+    // 코인 1개: 4 + 7 * 0.5 = 7.5
+    expect(expectedAttackDamage(stat(4, 7, 1), 1, 0.5)).toBeCloseTo(7.5);
+    // 코인 r개: r*base + coinPower*p*r(r+1)/2 → 2*4 + 5*0.5*3 = 15.5
+    expect(expectedAttackDamage(stat(4, 5, 2), 2, 0.5)).toBeCloseTo(15.5);
+  });
+
+  it('위력이 0에서 잘리는 경우를 정확히 계산한다', () => {
+    // 기본 3, 코인 -2, 코인 3개, 앞면 확률 50%
+    // 1번째: 3(50%) / 1(50%) → 2.0
+    // 2번째: 3(25%) / 1(50%) / 0(25%, 3-4=-1이 0으로) → 1.25
+    // 3번째: 3(12.5%) / 1(37.5%) / 0 / 0 → 0.75
+    expect(expectedAttackDamage(stat(3, -2, 3), 3, 0.5)).toBeCloseTo(4.0);
+  });
+
+  it('모두 앞면이 나오는 극단에서도 음수가 되지 않는다', () => {
+    // 앞면 확률 100%: 3-2=1, 3-4→0, 3-6→0 → 합 1
+    expect(expectedAttackDamage(stat(3, -2, 3), 3, 1)).toBeCloseTo(1);
+    expect(expectedAttackDamage(stat(0, -5, 4), 4, 0.5)).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('마이너스 코인이 있는 합 확률', () => {
+  it('위력이 항상 0으로 잘리는 쪽은 위력이 양수인 쪽에게 항상 진다', () => {
+    // A: 기본 0, 코인 -5 → 위력은 항상 0 / B: 위력 1 고정
+    const dist = clashDistribution(stat(0, -5, 1), stat(1, 0, 1), 0.5);
+    expect(sum(dist.b)).toBeCloseTo(1);
+    expect(sum(dist.a)).toBeCloseTo(0);
+  });
+
+  it('앞면이 나오면 오히려 불리해진다 (앞면 확률이 높을수록 승률이 낮다)', () => {
+    const negative = stat(6, -4, 1); // 뒷면 6 / 앞면 2
+    const fixed = stat(4, 0, 1);
+    const lowHeads = sum(clashDistribution(negative, fixed, 0.1).a);
+    const highHeads = sum(clashDistribution(negative, fixed, 0.9).a);
+    expect(lowHeads).toBeGreaterThan(highHeads);
   });
 });
 

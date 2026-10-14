@@ -19,7 +19,10 @@ export function TitleScreen({ best, onStart }: { best: number; onStart: () => vo
       <details className="howto">
         <summary>게임 방법</summary>
         <ul>
-          <li>층이 시작될 때마다 보상 선택지 중 하나를 골라 스킬을 강화합니다.</li>
+          <li>
+            층이 시작되면 그 층의 적 스킬이 먼저 공개됩니다. 적을 보고 보상 선택지 중 하나를 골라 스킬을
+            강화합니다.
+          </li>
           <li>전투는 자동으로 진행됩니다. 양쪽이 스킬을 꺼내 합을 겨루고, 합에서 이긴 쪽만 공격합니다.</li>
           <li>
             합에서는 코인을 굴려 앞면이 많을수록 위력이 커지고, 위력이 낮은 쪽이 코인을 1개 잃습니다.

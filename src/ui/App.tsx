@@ -45,7 +45,7 @@ export default function App() {
     screen = <TitleScreen best={best} onStart={startRun} />;
   } else if (state.phase === 'reward') {
     screen = <RewardScreen state={state} onChoose={choose} />;
-  } else if (state.phase === 'battle' && state.battle !== null && state.enemySkills !== null) {
+  } else if (state.phase === 'battle' && state.battle !== null) {
     screen = (
       <BattleScreen
         floor={state.floor}
@@ -77,8 +77,11 @@ export default function App() {
         {screen}
       </main>
       <footer className="fan-note">
-        Project Moon의 Limbus Company를 바탕으로 한 비공식 팬 2차 창작 프로젝트입니다. 공식 이미지와
-        사운드는 사용하지 않았습니다.
+        <p>이 프로젝트는 Limbus Company(Project Moon)의 2차 창작 팬 프로젝트이며 비공식입니다.</p>
+        <p>
+          ProjectMoon의 공식 이미지 혹은 사운드 리소스는 사용되지 않았으며, 상업적, 영리적인 목적이
+          없습니다.
+        </p>
       </footer>
     </div>
   );

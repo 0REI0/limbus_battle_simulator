@@ -9,7 +9,7 @@ import { useBattlePlayback } from '../hooks/useBattlePlayback';
 import { buildFrames, type AttackView, type BattleView } from '../playback';
 
 const SPEEDS = [1, 2, 4] as const;
-const NAME: Record<Side, string> = { player: '나', enemy: '적' };
+const NAME: Record<Side, string> = { player: '플레이어', enemy: '적' };
 
 function Fighter({ side, view, skills }: { side: Side; view: BattleView; skills: SkillSet }) {
   const tier = view.tiers[side];
@@ -51,13 +51,16 @@ function ClashRow({
   leading: boolean;
 }) {
   const stats = skills[tier];
+  // 코인 위력이 음수면 위력이 0 아래로 내려가지 않는다는 점을 계산식에 같이 표시
+  const raw = stats.basePower + stats.coinPower * data.heads;
   return (
     <div className={`clash__row clash__row--${side}${leading ? ' is-leading' : ''}`}>
       <CoinRow coins={data.coins} size="lg" side={side} />
       <p className="clash__power">
         <span className="num">{data.power}</span>
         <span className="clash__calc">
-          {stats.basePower} + {stats.coinPower}×{data.heads}
+          {stats.basePower} {stats.coinPower < 0 ? '\u2212' : '+'} {Math.abs(stats.coinPower)}×{data.heads}
+          {raw < 0 ? ' (최소 0)' : ''}
         </span>
       </p>
     </div>
@@ -69,7 +72,7 @@ function AttackStage({ attack }: { attack: AttackView }) {
   return (
     <div className={`attack attack--${attack.attacker}`}>
       <p className="arena__caption">
-        {attack.attacker === 'player' ? '내 공격' : '적의 공격'} ({attack.tier}스킬)
+        {NAME[attack.attacker]}의 공격 ({attack.tier}스킬)
       </p>
       <CoinRow coins={attack.coins} shown={attack.shown} size="lg" side={attack.attacker} />
       <p className="attack__damage">
@@ -111,7 +114,7 @@ function Arena({ view, specs }: { view: BattleView; specs: Record<Side, SkillSet
         <div className="clash" key={`${view.turn}-${clash.round}`}>
           <ClashRow side="enemy" data={clash.enemy} skills={specs.enemy} tier={enemy} leading={clash.result === 'enemy'} />
           <p className="arena__caption">
-            {view.turn}턴, 합 {clash.round}라운드
+            {view.turn}턴, {clash.round}합
             {clash.result === 'draw' ? ' (무승부)' : ''}
           </p>
           <ClashRow side="player" data={clash.player} skills={specs.player} tier={player} leading={clash.result === 'player'} />
@@ -222,7 +225,7 @@ export function BattleScreen({
         <summary>양쪽 스킬 스펙 보기</summary>
         <div className="specs__grid">
           <div>
-            <h3 className="specs__who">나</h3>
+            <h3 className="specs__who">플레이어</h3>
             <SkillList skills={skills} />
           </div>
           <div>

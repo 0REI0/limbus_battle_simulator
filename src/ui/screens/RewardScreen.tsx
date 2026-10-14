@@ -1,7 +1,7 @@
 import { applyReward, describeReward, STAT_LABEL } from '../../core/rewards';
 import type { RunState } from '../../core/run';
 import type { Reward, SkillSet } from '../../core/types';
-import { REWARDS, rewardCountForFloor } from '../../data/balance';
+import { maxHpForFloor, REWARDS, rewardCountForFloor } from '../../data/balance';
 import { TierPips } from '../components/Meters';
 import { SkillList, SpecDiff } from '../components/SkillSpec';
 import { formatDelta } from '../format';
@@ -81,14 +81,22 @@ export function RewardScreen({
       </ul>
 
       <section className="panel">
-        <h2 className="panel__title">내 스킬</h2>
+        <h2 className="panel__title">플레이어 스킬</h2>
         <SkillList skills={state.skills} />
-        <p className="hint">위력은 기본 + 코인 × 앞면 개수입니다. 코인 개수는 합에서 버티는 횟수이자 공격 횟수입니다.</p>
+        <p className="hint">
+          위력은 기본 + 코인 × 앞면 개수이고, 0 아래로는 내려가지 않습니다. 코인 개수는 합에서 버티는 횟수이자
+          공격 횟수입니다.
+        </p>
       </section>
 
-      <p className="hint">
-        이 층의 적은 보상 {rewardCountForFloor(state.floor)}개를 받은 상태로 나옵니다.
-      </p>
+      <section className="panel panel--enemy">
+        <h2 className="panel__title">이 층의 적 스킬</h2>
+        <SkillList skills={state.enemySkills} />
+        <p className="hint">
+          적은 보상 {rewardCountForFloor(state.floor)}개를 받은 상태입니다. 양쪽 체력은 모두{' '}
+          {maxHpForFloor(state.floor)}입니다.
+        </p>
+      </section>
     </section>
   );
 }

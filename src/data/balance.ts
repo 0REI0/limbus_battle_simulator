@@ -52,7 +52,7 @@ export const COIN = {
 //
 // 보상 티어(1~5)마다 보상 목록을 가진다. 보상 하나 = 효과(RewardEffect) 목록.
 // 효과 하나 = (스킬 종류, 스탯 종류, 변동 수치). 변동 수치는 음수도 가능.
-// 감소 효과로 스탯이 아래 한계(기본/코인 위력 0, 코인 개수 1)보다 내려가면 한계로 맞춘다.
+// 감소 효과로 스탯이 아래 한계(기본 위력 0, 코인 개수 1)보다 내려가면 한계로 맞춘다. 코인 위력은 하한이 없다(음수 가능).
 // ------------------------------------------------------------
 
 export const REWARD_TIERS: readonly RewardTier[] = [1, 2, 3, 4, 5];
@@ -131,12 +131,17 @@ export const rewardCountForFloor = (floor: number): number =>
  * 적이 보상을 받는 방식. 적은 층수 * n 번의 보상을 받는다 (rewardCountForFloor).
  *  - 'random': 보상 풀에서 무작위로 하나씩 (선택지 없이)
  *  - 'rank'  : 플레이어와 같은 방식으로 선택지(REWARDS.choicesPerPick개)를 받고,
- *              기대 순이득(core/evaluate.ts의 skillSetValue)이 높은 순으로 정렬해 pickRank번째를 고른다
+ *              기대 순이득(core/evaluate.ts의 skillSetValue)이 높은 순으로 정렬한 뒤
+ *              rankWeights의 확률로 순위를 정해 그 순위의 선택지를 고른다
  */
 export const ENEMY = {
-  pickMode: 'rank' as 'random' | 'rank',
-  /** pickMode가 'rank'일 때: 1 = 가장 좋은 선택지, 2 = 두 번째로 좋은 선택지 ... (선택지 수를 넘으면 가장 낮은 것) */
-  pickRank: 1,
+  pickMode: 'random' as 'random' | 'rank',
+  /**
+   * 'rank' 모드에서 각 순위를 고를 가중치. 첫 값이 1순위(가장 좋은 선택지), 둘째가 2순위 ...
+   * 예: [60, 30, 10] = 1순위 60%, 2순위 30%, 3순위 10%. [100] = 항상 가장 좋은 것.
+   * 선택지 수보다 긴 부분은 무시하고 남은 순위끼리 비율을 다시 계산한다.
+   */
+  rankWeights: [60, 30, 10] as number[],
 };
 
 // ------------------------------------------------------------

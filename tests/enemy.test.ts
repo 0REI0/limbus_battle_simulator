@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createEnemySkills, pickEnemyReward } from '../src/core/enemy';
+import { chooseEnemyRank, createEnemySkills, pickEnemyReward } from '../src/core/enemy';
 import { skillSetValue } from '../src/core/evaluate';
 import { applyRandomRewards, applyReward, generateChoices } from '../src/core/rewards';
 import { createRng } from '../src/core/rng';
+import { fixedRng } from './helpers';
 import { expectedDamage } from '../sim/policies';
 import { BASE_SKILLS, ENEMY, rewardCountForFloor } from '../src/data/balance';
 
@@ -97,9 +98,89 @@ describe('적의 보상 획득 방식', () => {
     });
   });
 
+  describe('chooseEnemyRank (순위 확률 선택)', () => {
+    it('난수 구간에 따라 순위가 정해진다 (60/30/10)', () => {
+      const rankAt = (v: number, n = 3) => chooseEnemyRank([60, 30, 10], n, fixedRng([v]));
+      expect(rankAt(0.0)).toBe(1);
+      expect(rankAt(0.3)).toBe(1);
+      expect(rankAt(0.75)).toBe(2);
+      expect(rankAt(0.95)).toBe(3);
+    });
+
+    it('많이 뽑으면 비율이 가중치에 가깝다', () => {
+      const rng = createRng(5);
+      const n = 30000;
+      const counts = [0, 0, 0, 0];
+      for (let i = 0; i < n; i++) counts[chooseEnemyRank([60, 30, 10], 3, rng)]++;
+      expect(Math.abs(counts[1] / n - 0.6)).toBeLessThan(0.015);
+      expect(Math.abs(counts[2] / n - 0.3)).toBeLessThan(0.015);
+      expect(Math.abs(counts[3] / n - 0.1)).toBeLessThan(0.015);
+    });
+
+    it('선택지가 가중치보다 적으면 남은 순위끼리 비율을 다시 계산한다', () => {
+      const rng = createRng(8);
+      const n = 20000;
+      const counts = [0, 0, 0, 0];
+      for (let i = 0; i < n; i++) counts[chooseEnemyRank([60, 30, 10], 2, rng)]++;
+      expect(counts[3]).toBe(0); // 선택지가 2개면 3순위는 나올 수 없다
+      expect(Math.abs(counts[1] / n - 60 / 90)).toBeLessThan(0.015);
+    });
+
+    it('순위는 항상 1 이상, 선택지 수 이하다', () => {
+      const rng = createRng(2);
+      for (let choiceCount = 1; choiceCount <= 5; choiceCount++) {
+        for (let i = 0; i < 200; i++) {
+          const rank = chooseEnemyRank([5, 4, 3, 2, 1], choiceCount, rng);
+          expect(rank).toBeGreaterThanOrEqual(1);
+          expect(rank).toBeLessThanOrEqual(choiceCount);
+        }
+      }
+    });
+
+    it('가중치가 0인 순위는 나오지 않고, 남은 순위가 모두 0이면 가장 낮은 순위를 고른다', () => {
+      const rng = createRng(3);
+      for (let i = 0; i < 300; i++) expect(chooseEnemyRank([0, 1], 3, rng)).toBe(2);
+      expect(chooseEnemyRank([0, 0, 0, 1], 3, createRng(1))).toBe(3);
+    });
+
+    it('가중치와 상관없이 난수를 정확히 1개만 소비한다', () => {
+      for (const weights of [[100], [60, 30, 10], [0, 0, 5], [0, 0, 0]]) {
+        const base = createRng(4);
+        let calls = 0;
+        const counting = {
+          ...base,
+          next: () => {
+            calls++;
+            return base.next();
+          },
+        };
+        chooseEnemyRank(weights, 3, counting);
+        expect(calls).toBe(1);
+      }
+    });
+
+    it('잘못된 가중치는 에러', () => {
+      const rng = createRng(1);
+      expect(() => chooseEnemyRank([], 3, rng)).toThrow();
+      expect(() => chooseEnemyRank([-1, 2], 3, rng)).toThrow();
+      expect(() => chooseEnemyRank([Number.NaN], 3, rng)).toThrow();
+    });
+  });
+
   describe("'rank' 모드", () => {
+    const averageValue = (weights: number[], seeds = 60, floor = 5) => {
+      ENEMY.pickMode = 'rank';
+      ENEMY.rankWeights = weights;
+      let total = 0;
+      for (let seed = 1; seed <= seeds; seed++) {
+        total += skillSetValue(createEnemySkills(floor, createRng(seed)));
+      }
+      return total / seeds;
+    };
+
     it('같은 시드면 같은 적이 나오고, 기본 스펙과 달라진다', () => {
       ENEMY.pickMode = 'rank';
+      ENEMY.rankWeights = [60, 30, 10];
       for (let floor = 1; floor <= 6; floor++) {
         const a = createEnemySkills(floor, createRng(floor));
         expect(a).toEqual(createEnemySkills(floor, createRng(floor)));
@@ -107,30 +188,33 @@ describe('적의 보상 획득 방식', () => {
       }
     });
 
-    it('rank가 낮을수록(더 좋은 선택을 할수록) 적이 평균적으로 더 강하다', () => {
-      ENEMY.pickMode = 'rank';
-      const averageValue = (rank: number) => {
-        ENEMY.pickRank = rank;
-        let total = 0;
-        const seeds = 60;
-        for (let seed = 1; seed <= seeds; seed++) {
-          total += skillSetValue(createEnemySkills(5, createRng(seed)));
-        }
-        return total / seeds;
-      };
-      const r1 = averageValue(1);
-      const r2 = averageValue(2);
-      const r3 = averageValue(3);
-      expect(r1).toBeGreaterThan(r2);
-      expect(r2).toBeGreaterThan(r3);
+    it('항상 1순위를 고르면 항상 3순위를 고르는 것보다 적이 훨씬 강하고, 섞으면 그 사이다', () => {
+      const best = averageValue([100]);
+      const mixed = averageValue([60, 30, 10]);
+      const worst = averageValue([0, 0, 100]);
+      expect(best).toBeGreaterThan(mixed);
+      expect(mixed).toBeGreaterThan(worst);
     });
 
-    it('rank 3(가장 나쁜 선택)도 기본 스펙보다는 강해진다 (보상은 대체로 이득이므로)', () => {
-      ENEMY.pickMode = 'rank';
-      ENEMY.pickRank = 3;
-      let total = 0;
-      for (let seed = 1; seed <= 40; seed++) total += skillSetValue(createEnemySkills(5, createRng(seed)));
-      expect(total / 40).toBeGreaterThan(0);
+    it('1순위 비중이 높을수록 적이 평균적으로 강하다', () => {
+      expect(averageValue([80, 15, 5])).toBeGreaterThan(averageValue([30, 40, 30]));
+    });
+
+    it('3순위만 골라도 기본 스펙보다는 강해진다 (보상은 대체로 이득이므로)', () => {
+      expect(averageValue([0, 0, 100], 40)).toBeGreaterThan(0);
+    });
+
+    it('가중치만 바꿔도 나머지 난수열이 어긋나지 않는다 (같은 시드의 선택지 후보가 같다)', () => {
+      // 층 1: 선택지 생성 후 순위 난수 1개만 소비하므로, 가중치가 달라도 다음 난수는 같은 지점에서 이어진다
+      const probe = (weights: number[]) => {
+        ENEMY.pickMode = 'rank';
+        ENEMY.rankWeights = weights;
+        const rng = createRng(123);
+        createEnemySkills(1, rng);
+        return rng.next();
+      };
+      expect(probe([100])).toBe(probe([0, 0, 100]));
+      expect(probe([60, 30, 10])).toBe(probe([100]));
     });
   });
 });

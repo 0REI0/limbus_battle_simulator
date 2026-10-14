@@ -17,8 +17,15 @@ import type {
   SkillStatKey,
 } from './types';
 
-/** 스탯이 내려갈 수 있는 한계 (감소 효과로 이보다 낮아지면 한계값으로 맞춘다) */
-const STAT_MIN: Record<SkillStatKey, number> = { basePower: 0, coinPower: 0, coinCount: 1 };
+/**
+ * 스탯이 내려갈 수 있는 한계 (감소 효과로 이보다 낮아지면 한계값으로 맞춘다).
+ * 코인 위력은 하한이 없다 (마이너스 코인 가능. 단, 최종 위력은 0 미만이 되지 않는다: coins.ts).
+ */
+const STAT_MIN: Record<SkillStatKey, number> = {
+  basePower: 0,
+  coinPower: Number.NEGATIVE_INFINITY,
+  coinCount: 1,
+};
 
 export const STAT_LABEL: Record<SkillStatKey, string> = {
   basePower: '기본 위력',

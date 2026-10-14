@@ -33,7 +33,10 @@ describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는
     const html = render(<App />);
     expect(html).toContain('림버스 배틀 시뮬레이터');
     expect(html).toContain('게임 시작');
-    expect(html).toContain('비공식 팬 2차 창작');
+    expect(html).toContain('이 프로젝트는 Limbus Company(Project Moon)의 2차 창작 팬 프로젝트이며 비공식입니다.');
+    expect(html).toContain(
+      'ProjectMoon의 공식 이미지 혹은 사운드 리소스는 사용되지 않았으며, 상업적, 영리적인 목적이 없습니다.',
+    );
   });
 
   it('보상 선택 화면에 모든 선택지와 내 스킬이 나온다', () => {
@@ -41,8 +44,21 @@ describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는
     const html = render(<RewardScreen state={state} onChoose={noop} />);
     expect(html).toContain('보상을 하나 고르세요');
     for (const reward of state.choices) expect(html).toContain(describeReward(reward));
-    expect(html).toContain('내 스킬');
+    expect(html).toContain('플레이어 스킬');
+    expect(html).not.toContain('내 스킬');
     expect((html.match(/class="reward reward--t\d"/g) ?? []).length).toBe(state.choices.length);
+  });
+
+  it('보상 선택 화면에서는 플레이어 스킬 아래에 이 층의 적 스킬이 먼저 공개된다', () => {
+    const state = startRun(1);
+    const html = render(<RewardScreen state={state} onChoose={noop} />);
+    const playerAt = html.indexOf('플레이어 스킬');
+    const enemyAt = html.indexOf('이 층의 적 스킬');
+    expect(playerAt).toBeGreaterThan(-1);
+    expect(enemyAt).toBeGreaterThan(playerAt);
+    // 스킬 목록이 플레이어 3줄 + 적 3줄
+    expect((html.match(/class="skills__row"/g) ?? []).length).toBe(6);
+    expect(html).toContain(`양쪽 체력은 모두 ${maxHpForFloor(1)}입니다.`);
   });
 
   it('전투 화면은 재생 시작 전 상태(전투 시작)로 그려진다', () => {
@@ -51,7 +67,7 @@ describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는
       <BattleScreen
         floor={state.floor}
         skills={state.skills}
-        enemySkills={state.enemySkills!}
+        enemySkills={state.enemySkills}
         battle={state.battle!}
         onContinue={noop}
       />,
