@@ -31,7 +31,7 @@ function playToGameOver(seed: number): RunState {
 describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는지 확인)', () => {
   it('앱의 첫 화면은 타이틀이다', () => {
     const html = render(<App />);
-    expect(html).toContain('림버스 배틀 로그라이크');
+    expect(html).toContain('림버스 오토 배틀 로그라이크');
     expect(html).toContain('게임 시작');
     expect(html).toContain('이 프로젝트는 Limbus Company(Project Moon)의 2차 창작 팬 프로젝트이며 비공식입니다.');
     expect(html).toContain(
