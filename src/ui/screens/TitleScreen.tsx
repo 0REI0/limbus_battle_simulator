@@ -8,7 +8,7 @@ export function TitleScreen({ best, onStart }: { best: number; onStart: () => vo
         <Coin face="heads" size="xl" side="player" />
         <Coin face="tails" size="xl" side="enemy" />
       </div>
-      <h1 className="title__name">림버스 배틀 시뮬레이터</h1>
+      <h1 className="title__name">림버스 배틀 로그라이크</h1>
       <p className="title__lead">코인을 굴려 합을 이기고, 한 층이라도 더 높이 올라가세요.</p>
 
       <button type="button" className="btn btn--primary btn--wide" onClick={onStart}>
