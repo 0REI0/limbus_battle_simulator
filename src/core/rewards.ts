@@ -41,13 +41,31 @@ export function describeReward(reward: Reward): string {
     .join(' / ');
 }
 
+// 보상표(REWARD_TABLE)는 게임 중에 바뀌지 않으므로, 티어별 보상 목록을 한 번만 만들어 재사용한다.
+// (보상을 뽑을 때마다 id 문자열과 객체를 새로 만들면 시뮬레이션에서 가장 큰 비용이 된다)
+// 표의 배열 객체를 키로 쓰기 때문에, 표를 통째로 교체하면 자동으로 다시 만든다.
+const poolCache = new WeakMap<RewardEffect[][], readonly Reward[]>();
+
+/** 캐시된 보상 목록. 반환된 보상 객체는 공유되므로 수정할 수 없게 얼려 둔다 */
+function cachedPool(rewardTier: RewardTier): readonly Reward[] {
+  const entries = REWARD_TABLE[rewardTier];
+  let pool = poolCache.get(entries);
+  if (pool === undefined) {
+    pool = entries.map((effects) =>
+      Object.freeze({
+        id: rewardId(rewardTier, effects),
+        rewardTier,
+        effects: Object.freeze(effects.map((e) => Object.freeze({ ...e }))) as RewardEffect[],
+      }),
+    );
+    poolCache.set(entries, pool);
+  }
+  return pool;
+}
+
 /** 해당 보상 티어에서 나올 수 있는 모든 보상 (REWARD_TABLE 순서 그대로) */
 export function getRewardPool(rewardTier: RewardTier): Reward[] {
-  return REWARD_TABLE[rewardTier].map((effects) => ({
-    id: rewardId(rewardTier, effects),
-    rewardTier,
-    effects: effects.map((e) => ({ ...e })),
-  }));
+  return [...cachedPool(rewardTier)];
 }
 
 /** 주어진 티어들 중에서 가중치대로 하나를 뽑는다 */
@@ -72,9 +90,10 @@ export function rollRewardTier(rng: Rng): RewardTier {
  * 후보가 하나도 없으면 null.
  */
 export function pickReward(rng: Rng, exclude: ReadonlySet<string> = new Set()): Reward | null {
-  const candidatesByTier = new Map<RewardTier, Reward[]>();
+  const candidatesByTier = new Map<RewardTier, readonly Reward[]>();
   for (const tier of REWARD_TIERS) {
-    const candidates = getRewardPool(tier).filter((r) => !exclude.has(r.id));
+    const pool = cachedPool(tier);
+    const candidates = exclude.size === 0 ? pool : pool.filter((r) => !exclude.has(r.id));
     if (candidates.length > 0) candidatesByTier.set(tier, candidates);
   }
   const available = REWARD_TIERS.filter((t) => candidatesByTier.has(t));

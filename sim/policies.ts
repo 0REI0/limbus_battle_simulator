@@ -9,7 +9,7 @@ import { applyReward } from '../src/core/rewards';
 import type { RunState } from '../src/core/run';
 import type { Reward, Rng, SkillSet, SkillStatKey, SkillTier } from '../src/core/types';
 import { BASE_SKILLS, DECK_COMPOSITION } from '../src/data/balance';
-import { turnExpectation } from './analysis';
+import { turnExpectation } from '../src/core/evaluate';
 
 export interface Policy {
   name: string;

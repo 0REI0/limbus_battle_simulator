@@ -64,9 +64,8 @@ const count = (skill: SkillTier, amount: number): RewardEffect => ({ skillTier: 
 
 /**
  * 티어별 보상 목록. 보상 하나 = 효과들의 배열.
- * [초안] 보상 가치를 계산하는 도구(npm run sim:rewards)의 "net"(합 승률 변화까지 반영한 순이득)을
- * 참고해 비슷한 보상끼리 한 티어로 묶은 것이다. 기본 스펙/규칙을 바꾸면 가치가 달라지므로
- * 그때마다 도구를 다시 돌려 티어를 조정한다. 값은 기본 스펙 기준이라, 강화가 쌓이면 실제 가치는 달라진다.
+ * 티어는 보상의 성격에 따라 분류하고, 같은 티어 안에서는 가치(기대 추가 데미지)가 비슷해지도록 수치를 맞춘다.
+ * 가치는 npm run sim:rewards 로 확인한다. 기본 스펙/규칙을 바꾸면 가치가 달라지므로 그때마다 다시 확인한다.
  */
 export const REWARD_TABLE: Record<RewardTier, RewardEffect[][]> = {
   1: [
@@ -96,7 +95,7 @@ export const REWARD_TABLE: Record<RewardTier, RewardEffect[][]> = {
   4: [
     [count(1, 1), power(1, -2)],
     [count(2, 1), power(2, -1)],
-    [count(3, 1), power(3, 1)]
+    [count(3, 1), power(3, 1)],
   ],
   5: [
     [count(1, 1), power(1, -1)],
@@ -127,6 +126,18 @@ export const REWARDS = {
  */
 export const rewardCountForFloor = (floor: number): number =>
   floor * REWARDS.picksPerFloor;
+
+/**
+ * 적이 보상을 받는 방식. 적은 층수 * n 번의 보상을 받는다 (rewardCountForFloor).
+ *  - 'random': 보상 풀에서 무작위로 하나씩 (선택지 없이)
+ *  - 'rank'  : 플레이어와 같은 방식으로 선택지(REWARDS.choicesPerPick개)를 받고,
+ *              기대 순이득(core/evaluate.ts의 skillSetValue)이 높은 순으로 정렬해 pickRank번째를 고른다
+ */
+export const ENEMY = {
+  pickMode: 'rank' as 'random' | 'rank',
+  /** pickMode가 'rank'일 때: 1 = 가장 좋은 선택지, 2 = 두 번째로 좋은 선택지 ... (선택지 수를 넘으면 가장 낮은 것) */
+  pickRank: 1,
+};
 
 // ------------------------------------------------------------
 // 전투 제한

@@ -59,6 +59,27 @@ describe('보상 풀', () => {
   });
 });
 
+describe('보상 풀 캐시', () => {
+  it('같은 티어를 여러 번 요청해도 같은 내용이고, 배열을 바꿔도 다음 요청에 영향이 없다', () => {
+    const first = getRewardPool(1);
+    const length = first.length;
+    first.pop(); // 반환된 배열은 호출자의 것이므로 바꿔도 된다
+    expect(getRewardPool(1)).toHaveLength(length);
+    expect(getRewardPool(1)).toEqual(getRewardPool(1));
+  });
+
+  it('공유되는 보상 객체는 수정할 수 없다', () => {
+    const [reward] = getRewardPool(1);
+    expect(() => {
+      (reward as { id: string }).id = 'hacked';
+    }).toThrow();
+    expect(() => {
+      (reward.effects[0] as { amount: number }).amount = 999;
+    }).toThrow();
+    expect(getRewardPool(1)[0].id).not.toBe('hacked');
+  });
+});
+
 describe('티어 추첨', () => {
   const total = REWARD_TIERS.reduce((s, t) => s + REWARD_TIER_WEIGHTS[t], 0);
 

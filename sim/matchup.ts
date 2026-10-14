@@ -13,7 +13,7 @@ import { createCombatant, runBattle } from '../src/core/battle';
 import { createRng } from '../src/core/rng';
 import type { Combatant, SkillTier } from '../src/core/types';
 import { BASE_SKILLS, COIN, DECK_COMPOSITION } from '../src/data/balance';
-import { computeMatchup, DECK_SIZE, TIERS, turnExpectation, winnerHeadsProb, type Matchup } from './analysis';
+import { computeMatchup, DECK_SIZE, TIERS, turnExpectation, winnerHeadsProb, type Matchup } from '../src/core/evaluate';
 import { applyOverrides } from './overrides';
 
 const overrides = applyOverrides();

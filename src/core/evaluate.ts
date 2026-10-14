@@ -1,10 +1,13 @@
 // ============================================================
-// sim/analysis.ts - 합 확률 / 기대 데미지 계산 (몬테카를로 아님, 정확한 확률 계산)
-// matchup.ts, rewardValues.ts, policies.ts가 공유한다.
+// core/evaluate.ts - 합 확률 / 기대 데미지 계산 (몬테카를로 아님, 정확한 확률 계산)
+//
+// 스킬 스펙이 얼마나 강한지 숫자로 평가한다. 쓰는 곳:
+//  - core/enemy.ts: 적이 보상 선택지를 평가해 고를 때
+//  - sim/: 밸런스 분석 도구와 시뮬레이션 정책
 // ============================================================
 
-import type { SkillSet, SkillStats, SkillTier } from '../src/core/types';
-import { COIN, DECK_COMPOSITION } from '../src/data/balance';
+import { BASE_SKILLS, COIN, DECK_COMPOSITION } from '../data/balance';
+import type { SkillSet, SkillStats, SkillTier } from './types';
 
 export const TIERS: readonly SkillTier[] = [1, 2, 3];
 
@@ -97,7 +100,7 @@ export interface Matchup {
   avgRemainWin: number; // 행이 이겼을 때 남는 코인 평균
 }
 
-export function computeMatchup(
+function computeMatchupUncached(
   rowTier: SkillTier,
   colTier: SkillTier,
   rowSkills: SkillSet,
@@ -133,6 +136,68 @@ export function computeMatchup(
 /** 비교 단위: 스킬 6번 사용 = 묶음 한 사이클 (보상 가치를 "한 묶음 기준"으로 보여줄 때 곱한다) */
 export const DECK_SIZE = TIERS.reduce((s, t) => s + DECK_COMPOSITION[t], 0);
 
+// ---- 결과 캐시 ----
+// 합 확률 계산(clashDistribution)은 비싸지만 입력(두 스킬의 기본/코인 위력/코인 개수 + 정신력 설정)이 같으면
+// 결과도 항상 같다. 보상 선택지를 평가할 때는 스킬 하나만 바뀐 스펙을 반복해서 평가하므로
+// 나머지 매치업은 거의 항상 캐시에서 나온다. (적이 보상을 고르는 시뮬레이션이 약 10배 이상 빨라짐)
+const matchupCache = new Map<string, Matchup>();
+const MAX_CACHE_ENTRIES = 200_000;
+
+const statKey = (s: SkillStats) => `${s.basePower},${s.coinPower},${s.coinCount}`;
+
+/** 결과에 영향을 주는 정신력 관련 설정. 이 값이 바뀌면 캐시를 비운다 */
+interface CoinSettings {
+  baseHeadsPercent: number;
+  initialSanity: number;
+  sanityMode: string;
+  sanityOnClashWin: number;
+  sanityMin: number;
+  sanityMax: number;
+}
+let cachedSettings: CoinSettings | null = null;
+
+function syncCacheWithSettings(): void {
+  const c = cachedSettings;
+  if (
+    c !== null &&
+    c.baseHeadsPercent === COIN.baseHeadsPercent &&
+    c.initialSanity === COIN.initialSanity &&
+    c.sanityMode === COIN.sanityMode &&
+    c.sanityOnClashWin === COIN.sanityOnClashWin &&
+    c.sanityMin === COIN.sanityMin &&
+    c.sanityMax === COIN.sanityMax
+  ) {
+    return;
+  }
+  matchupCache.clear();
+  cachedSettings = {
+    baseHeadsPercent: COIN.baseHeadsPercent,
+    initialSanity: COIN.initialSanity,
+    sanityMode: COIN.sanityMode,
+    sanityOnClashWin: COIN.sanityOnClashWin,
+    sanityMin: COIN.sanityMin,
+    sanityMax: COIN.sanityMax,
+  };
+}
+
+/** 반환된 객체는 캐시와 공유되므로 수정하지 말 것 */
+export function computeMatchup(
+  rowTier: SkillTier,
+  colTier: SkillTier,
+  rowSkills: SkillSet,
+  colSkills: SkillSet,
+): Matchup {
+  syncCacheWithSettings();
+  const key = `${statKey(rowSkills[rowTier])}|${statKey(colSkills[colTier])}`;
+  const cached = matchupCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const result = computeMatchupUncached(rowTier, colTier, rowSkills, colSkills);
+  if (matchupCache.size >= MAX_CACHE_ENTRIES) matchupCache.clear(); // 메모리 무한 증가 방지
+  matchupCache.set(key, result);
+  return result;
+}
+
 /**
  * 양측 스킬이 묶음 구성 비율(1스킬 3 : 2스킬 2 : 3스킬 1)대로 무작위로 나온다고 보고 계산한 한 턴 평균.
  */
@@ -148,4 +213,13 @@ export function turnExpectation(player: SkillSet, enemy: SkillSet) {
     }
   }
   return { dealt, taken, net: dealt - taken };
+}
+
+/**
+ * 스킬 세트의 가치 = reference(기본: 기본 스펙) 상대로 한 턴에 얻는 기대 순이득
+ * (내가 입히는 기대 데미지 - 내가 받는 기대 데미지). 합 승률 변화까지 반영된다.
+ * 값이 클수록 강하다. 보상 선택지를 비교할 때 쓴다.
+ */
+export function skillSetValue(skills: SkillSet, reference: SkillSet = BASE_SKILLS): number {
+  return turnExpectation(skills, reference).net;
 }

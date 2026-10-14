@@ -1,0 +1,766 @@
+/* ============================================================
+   디자인 토큰
+   놋쇠(brass) = 나, 코인 앞면 / 장미(rose) = 적, 피해 / 박하(mint) = 정신력
+   보상 등급은 tier 색과 막대 개수로 함께 표시한다
+   ============================================================ */
+:root {
+  --bg: #0f1e20;
+  --bg-raised: #152a2c;
+  --bg-sunk: #0a1517;
+  --line: #2b4749;
+  --text: #e9e0cb;
+  --muted: #8ea69f;
+  --brass: #d9a84a;
+  --brass-deep: #7d6430;
+  --rose: #d9645a;
+  --rose-deep: #6e3631;
+  --mint: #7cc4b6;
+
+  --tier-1: #6f8c88;
+  --tier-2: #8db39b;
+  --tier-3: #c6c27a;
+  --tier-4: #e0a13f;
+  --tier-5: #f4c870;
+
+  --sans: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+  --serif: 'Noto Serif KR', 'Nanum Myeongjo', 'Batang', serif;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.6;
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2rem;
+  flex: 1;
+}
+
+.fan-note {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem 1rem 1.5rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* 숫자는 명조 계열 + 자릿수 고정 */
+.num {
+  font-family: var(--serif);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* ---------- 버튼 ---------- */
+.btn {
+  padding: 0.65rem 1.2rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--bg-raised);
+}
+
+.btn--primary {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: #2a1e06;
+  font-weight: 600;
+}
+
+.btn--primary:hover {
+  background: #e6b95c;
+}
+
+.btn--wide {
+  width: 100%;
+  padding: 0.85rem 1.2rem;
+}
+
+.btn--small {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.btn[aria-pressed='true'] {
+  background: var(--bg-raised);
+  border-color: var(--brass);
+  color: var(--brass);
+}
+
+/* ---------- 코인 ---------- */
+.coin-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.coin {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  font-family: var(--serif);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.coin--sm { width: 0.8rem; height: 0.8rem; font-size: 0; }
+.coin--md { width: 1.6rem; height: 1.6rem; font-size: 0.75rem; }
+.coin--lg { width: 2.7rem; height: 2.7rem; font-size: 1.1rem; }
+.coin--xl { width: 5.5rem; height: 5.5rem; font-size: 2.2rem; }
+
+.coin--heads {
+  background: radial-gradient(circle at 35% 30%, #f3d089, var(--brass) 55%, #a57a2a);
+  color: #3a2a08;
+  box-shadow: inset 0 0 0 0.12em rgba(58, 42, 8, 0.35);
+}
+
+.coin--enemy.coin--heads {
+  background: radial-gradient(circle at 35% 30%, #f0a39b, var(--rose) 55%, #a8403a);
+  color: #3a0f0c;
+  box-shadow: inset 0 0 0 0.12em rgba(58, 15, 12, 0.35);
+}
+
+.coin--tails {
+  background: var(--bg-sunk);
+  color: var(--muted);
+  box-shadow: inset 0 0 0 0.14em var(--brass-deep);
+}
+
+.coin--enemy.coin--tails {
+  box-shadow: inset 0 0 0 0.14em var(--rose-deep);
+}
+
+.coin--hidden {
+  border: 0.12em dashed var(--line);
+}
+
+.coin--heads,
+.coin--tails {
+  animation: coin-flip 0.38s ease-out;
+}
+
+@keyframes coin-flip {
+  from { transform: rotateY(90deg) scale(0.75); opacity: 0.2; }
+  to { transform: none; opacity: 1; }
+}
+
+.coin-pips {
+  display: inline-flex;
+  gap: 0.2rem;
+  align-items: center;
+}
+
+.coin-pips__dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--brass);
+}
+
+/* ---------- 등급 막대 / 체력 / 정신력 ---------- */
+.pips {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.15rem;
+  height: 1rem;
+}
+
+.pips__bar {
+  width: 0.28rem;
+  background: var(--line);
+}
+
+.pips__bar:nth-child(1) { height: 0.35rem; }
+.pips__bar:nth-child(2) { height: 0.5rem; }
+.pips__bar:nth-child(3) { height: 0.65rem; }
+.pips__bar:nth-child(4) { height: 0.8rem; }
+.pips__bar:nth-child(5) { height: 0.95rem; }
+
+.pips__bar.is-on {
+  background: var(--tier, var(--brass));
+}
+
+.hp {
+  height: 0.6rem;
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+}
+
+.hp__fill {
+  height: 100%;
+  transition: width 0.45s ease;
+}
+
+.hp--player .hp__fill { background: var(--brass); }
+.hp--enemy .hp__fill { background: var(--rose); }
+
+.sanity__track {
+  position: relative;
+  height: 0.3rem;
+  margin-top: 0.55rem;
+  background: var(--bg-sunk);
+}
+
+.sanity__track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -0.2rem;
+  bottom: -0.2rem;
+  width: 1px;
+  background: var(--muted);
+}
+
+.sanity__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--mint);
+  transition: left 0.3s ease, width 0.3s ease;
+}
+
+.sanity__text {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ---------- 스킬 스펙 ---------- */
+.skills__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.skills__row:last-child {
+  border-bottom: 0;
+}
+
+.skills__tier {
+  min-width: 3.2rem;
+  font-weight: 600;
+}
+
+.spec {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.9rem;
+  font-size: 0.92rem;
+}
+
+.spec__item b {
+  font-family: var(--serif);
+  font-variant-numeric: tabular-nums;
+}
+
+.spec__changed {
+  color: var(--brass);
+}
+
+.panel {
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+}
+
+.panel__title {
+  margin-bottom: 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.panel .hint {
+  margin-top: 0.6rem;
+}
+
+/* ---------- 층 머리말 ---------- */
+.stagehead {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 1.1rem;
+}
+
+.stagehead--battle {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.8rem;
+}
+
+.stagehead__floor {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.stagehead__floor .num {
+  font-size: 2.6rem;
+  margin-right: 0.15rem;
+}
+
+.stagehead__note {
+  color: var(--muted);
+}
+
+/* ---------- 타이틀 ---------- */
+.title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  padding-top: 2.5rem;
+  text-align: center;
+}
+
+.title__coins {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.6rem;
+}
+
+.title__coins .coin--tails {
+  transform: translateY(0.8rem);
+}
+
+.title__name {
+  font-family: var(--serif);
+  font-size: 2.1rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.title__lead {
+  color: var(--muted);
+  max-width: 24rem;
+}
+
+.title__best {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.title .btn--primary {
+  max-width: 20rem;
+}
+
+.howto {
+  margin-top: 1rem;
+  width: 100%;
+  text-align: left;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+
+.howto summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.howto ul {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+  padding-left: 1.1rem;
+  list-style: disc;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+/* ---------- 보상 선택 ---------- */
+.choices {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.reward {
+  --tier: var(--tier-1);
+  display: grid;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  text-align: left;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--tier);
+  cursor: pointer;
+}
+
+.reward:hover {
+  background: #1a3336;
+  border-color: var(--tier);
+}
+
+.reward--t1 { --tier: var(--tier-1); }
+.reward--t2 { --tier: var(--tier-2); }
+.reward--t3 { --tier: var(--tier-3); }
+.reward--t4 { --tier: var(--tier-4); }
+.reward--t5 { --tier: var(--tier-5); }
+
+.reward__rank {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  color: var(--tier);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.reward__effects {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.delta {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+}
+
+.delta--up { color: var(--brass); }
+.delta--down { color: var(--rose); }
+
+.reward__preview {
+  display: grid;
+  gap: 0.2rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--line);
+}
+
+.reward__preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.8rem;
+}
+
+.reward__preview-tier {
+  min-width: 3.2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ---------- 전투 ---------- */
+.battle {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.fighter {
+  padding: 0.8rem 1rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--brass);
+}
+
+.fighter--enemy {
+  border-left-color: var(--rose);
+}
+
+.fighter__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.fighter__name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.fighter__hp {
+  color: var(--muted);
+}
+
+.fighter__hp .num {
+  color: var(--text);
+  font-size: 1.5rem;
+}
+
+.fighter__skill {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.8rem;
+  margin-top: 0.6rem;
+  min-height: 1.6rem;
+}
+
+.chip {
+  padding: 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid currentColor;
+}
+
+.fighter--player .chip { color: var(--brass); }
+.fighter--enemy .chip { color: var(--rose); }
+
+.arena {
+  display: grid;
+  place-items: center;
+  min-height: 15rem;
+  padding: 1rem 0.5rem;
+  border-block: 1px dashed var(--line);
+  text-align: center;
+}
+
+.arena__title {
+  font-family: var(--serif);
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.arena__note,
+.arena__caption {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.clash,
+.attack {
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+}
+
+.clash__row {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  opacity: 0.6;
+}
+
+.clash__row.is-leading {
+  opacity: 1;
+}
+
+.clash__power {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.clash__power .num {
+  font-size: 1.9rem;
+}
+
+.clash__row--player .num { color: var(--brass); }
+.clash__row--enemy .num { color: var(--rose); }
+
+.clash__calc {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.attack__damage {
+  font-size: 1.1rem;
+}
+
+.attack__number {
+  display: inline-block;
+  font-size: 2.6rem;
+  animation: hit-pop 0.3s ease-out;
+}
+
+.attack--player .attack__number { color: var(--brass); }
+.attack--enemy .attack__number { color: var(--rose); }
+
+@keyframes hit-pop {
+  from { transform: scale(1.5); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.speed {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.log {
+  max-height: 11rem;
+  overflow-y: auto;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.log li + li {
+  margin-top: 0.25rem;
+}
+
+.log li:last-child {
+  color: var(--text);
+}
+
+.specs summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.specs__grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.6rem;
+}
+
+.specs__who {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* ---------- 게임 오버 ---------- */
+.gameover {
+  display: grid;
+  gap: 0.7rem;
+  padding-top: 1.5rem;
+}
+
+.gameover__where {
+  color: var(--muted);
+}
+
+.gameover__score {
+  font-family: var(--serif);
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.gameover__score .num {
+  font-size: 4.5rem;
+  margin-right: 0.2rem;
+  color: var(--brass);
+}
+
+.gameover__record {
+  color: var(--muted);
+}
+
+.gameover__record.is-new {
+  color: var(--brass);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.history {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+}
+
+.history__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.2rem 0.6rem;
+}
+
+.history__floor {
+  min-width: 2.2rem;
+  color: var(--muted);
+}
+
+@media (min-width: 40rem) {
+  .title__name {
+    font-size: 2.6rem;
+  }
+
+  .specs__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -25,6 +25,10 @@ export interface SimStats {
   /** n층 이상 클리어한 판의 비율 (0~1) */
   shareAtLeast5: number;
   shareAtLeast10: number;
+  shareAtLeast20: number;
+  shareAtLeast30: number;
+  shareAtLeast40: number;
+  shareAtLeast50: number;
   /** 전투 한 번당 평균 턴 수 */
   avgTurns: number;
   /** 제한 턴 초과로 끝난 판의 비율 */
@@ -90,6 +94,10 @@ export function simulate(policy: Policy, options: SimOptions): SimStats {
     max: cleared[cleared.length - 1],
     shareAtLeast5: share(5),
     shareAtLeast10: share(10),
+    shareAtLeast20: share(20),
+    shareAtLeast30: share(30),
+    shareAtLeast40: share(40),
+    shareAtLeast50: share(50),
     avgTurns: battles > 0 ? totalTurns / battles : 0,
     turnLimitRunRate: turnLimitRuns / runs,
     cappedRuns,

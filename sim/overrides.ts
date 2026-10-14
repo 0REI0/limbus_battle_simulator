@@ -8,9 +8,11 @@
 //   --weights A,B,...  보상 티어 가중치, 티어 개수만큼 (예: 40,28,18,10,4)
 //   --sanity MODE      dynamic | fixed
 //   --sanity-win N     합 승리 시 정신력 증가량
+//   --enemy MODE       적의 보상 획득 방식: random | rank
+//   --enemy-rank N     rank 모드에서 몇 번째로 좋은 선택지를 고르는가 (1 = 가장 좋은 것, 2 = 두 번째)
 // ============================================================
 
-import { COIN, REWARD_TIERS, REWARD_TIER_WEIGHTS, REWARDS } from '../src/data/balance';
+import { COIN, ENEMY, REWARD_TIERS, REWARD_TIER_WEIGHTS, REWARDS } from '../src/data/balance';
 
 const argv = process.argv.slice(2);
 
@@ -70,6 +72,19 @@ export function applyOverrides(): string[] {
     COIN.sanityOnClashWin = sanityWin;
     applied.push(`sanity-win=${sanityWin}`);
   }
+
+  const enemy = arg('enemy');
+  if (enemy !== undefined) {
+    if (enemy !== 'random' && enemy !== 'rank') throw new Error('--enemy는 random | rank');
+    ENEMY.pickMode = enemy;
+    applied.push(`enemy=${enemy}`);
+  }
+  const enemyRank = numArg('enemy-rank');
+  if (enemyRank !== undefined) {
+    if (!Number.isInteger(enemyRank) || enemyRank < 1) throw new Error('--enemy-rank는 1 이상의 정수');
+    ENEMY.pickRank = enemyRank;
+    applied.push(`enemy-rank=${enemyRank}`);
+  }
   return applied;
 }
 
@@ -78,6 +93,7 @@ export function describeSettings(): string {
   return (
     `층당 보상 ${REWARDS.picksPerFloor}회, 선택지 ${REWARDS.choicesPerPick}개, ` +
     `티어 가중치 ${REWARD_TIERS.map((t) => REWARD_TIER_WEIGHTS[t]).join('/')}, ` +
-    `정신력 ${COIN.sanityMode}(+${COIN.sanityOnClashWin})`
+    `정신력 ${COIN.sanityMode}(+${COIN.sanityOnClashWin}), ` +
+    `적 보상 ${ENEMY.pickMode === 'random' ? '무작위' : `선택지 중 ${ENEMY.pickRank}번째로 좋은 것`}`
   );
 }

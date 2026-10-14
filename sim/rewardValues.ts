@@ -20,7 +20,7 @@ import {
   REWARD_TIERS,
   REWARD_TIER_WEIGHTS,
 } from '../src/data/balance';
-import { DECK_SIZE, turnExpectation } from './analysis';
+import { DECK_SIZE, turnExpectation } from '../src/core/evaluate';
 import { applyOverrides } from './overrides';
 import { expectedDamage } from './policies';
 

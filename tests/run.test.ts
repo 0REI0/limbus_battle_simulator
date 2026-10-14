@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyReward } from '../src/core/rewards';
 import { advanceFloor, chooseReward, floorsCleared, startRun, type RunState } from '../src/core/run';
-import { BASE_SKILLS, REWARDS } from '../src/data/balance';
+import { BASE_SKILLS, ENEMY, REWARDS } from '../src/data/balance';
 
 /** 항상 첫 번째 선택지를 고르며 게임 오버까지 진행 */
 function playToEnd(seed: number, maxSteps = 5000): RunState {
@@ -153,5 +153,21 @@ describe('한 판 전체', () => {
   it('같은 상태에서 같은 함수를 두 번 호출해도 결과가 같다 (React StrictMode 대비)', () => {
     const s = startRun(5);
     expect(chooseReward(s, s.choices[1].id)).toEqual(chooseReward(s, s.choices[1].id));
+  });
+
+  it("적이 선택지를 고르는 'rank' 모드에서도 한 판이 끝까지 진행되고 재현된다", () => {
+    const original = { ...ENEMY };
+    ENEMY.pickMode = 'rank';
+    ENEMY.pickRank = 2;
+    try {
+      for (let seed = 1; seed <= 20; seed++) {
+        const end = playToEnd(seed);
+        expect(end.phase).toBe('gameOver');
+        expect(end.battle!.winner).toBe('enemy');
+      }
+      expect(playToEnd(77)).toEqual(playToEnd(77));
+    } finally {
+      Object.assign(ENEMY, original);
+    }
   });
 });

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../src/core/rng';
+import { COIN } from '../src/data/balance';
 import { runBattle } from '../src/core/battle';
 import type { SkillSet, SkillStats, SkillTier } from '../src/core/types';
-import { clashDistribution, computeMatchup, sum, turnExpectation } from '../sim/analysis';
+import { clashDistribution, computeMatchup, skillSetValue, sum, turnExpectation } from '../src/core/evaluate';
 import { makeCombatant } from './helpers';
 
 const stat = (basePower: number, coinPower: number, coinCount: number): SkillStats => ({
@@ -46,6 +47,53 @@ describe('turnExpectation', () => {
     const better: SkillSet = { ...spec, 3: stat(9, 4, 2) };
     expect(turnExpectation(better, spec).net).toBeGreaterThan(0);
     expect(turnExpectation(spec, better).net).toBeLessThan(0);
+  });
+});
+
+describe('computeMatchup 캐시', () => {
+  const spec: SkillSet = { 1: stat(4, 7, 1), 2: stat(4, 5, 2), 3: stat(4, 3, 3) };
+
+  it('같은 입력이면 같은 결과를 돌려준다', () => {
+    const first = computeMatchup(2, 3, spec, spec);
+    const second = computeMatchup(2, 3, spec, spec);
+    expect(second).toEqual(first);
+  });
+
+  it('캐시에서 꺼낸 값이 새로 계산한 값과 같다 (스펙이 바뀌면 다른 값이 나온다)', () => {
+    const before = computeMatchup(1, 2, spec, spec);
+    const changed: SkillSet = { ...spec, 1: stat(9, 7, 1) };
+    const after = computeMatchup(1, 2, changed, spec);
+    expect(after.winRate).toBeGreaterThan(before.winRate);
+    // 원래 스펙으로 다시 계산해도 처음과 같다
+    expect(computeMatchup(1, 2, spec, spec)).toEqual(before);
+  });
+
+  it('정신력 설정이 바뀌면 캐시가 무효화되어 새 설정으로 계산된다', () => {
+    const original = COIN.sanityOnClashWin;
+    try {
+      const before = computeMatchup(3, 2, spec, spec); // 승자 정신력 +5 가정
+      COIN.sanityOnClashWin = 30; // 승자의 공격 코인 앞면 확률이 크게 올라 기대 데미지가 커진다
+      const after = computeMatchup(3, 2, spec, spec);
+      expect(after.dmgRow).toBeGreaterThan(before.dmgRow);
+      expect(after.winRate).toBeCloseTo(before.winRate); // 합 승률은 정신력 보상과 무관
+    } finally {
+      COIN.sanityOnClashWin = original;
+    }
+  });
+});
+
+describe('skillSetValue', () => {
+  const spec: SkillSet = { 1: stat(4, 7, 1), 2: stat(4, 5, 2), 3: stat(4, 3, 3) };
+
+  it('기준 스펙과 같으면 0, 더 강하면 양수, 더 약하면 음수다', () => {
+    expect(skillSetValue(spec, spec)).toBeCloseTo(0);
+    expect(skillSetValue({ ...spec, 2: stat(6, 5, 2) }, spec)).toBeGreaterThan(0);
+    expect(skillSetValue({ ...spec, 2: stat(2, 5, 2) }, spec)).toBeLessThan(0);
+  });
+
+  it('turnExpectation의 순이득과 같은 값이다', () => {
+    const better: SkillSet = { ...spec, 1: stat(4, 7, 2) };
+    expect(skillSetValue(better, spec)).toBeCloseTo(turnExpectation(better, spec).net);
   });
 });
 

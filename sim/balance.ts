@@ -38,7 +38,7 @@ const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 console.log('\n[클리어한 층 수]');
 console.log(
   'policy'.padEnd(11) +
-    ['avg', 'median', 'p90', 'max', '>=5F', '>=10F', 'turns', 'TL%']
+    ['avg', 'median', 'p90', 'max', '>=5F', '>=10F', '>=20F', '>=30F', '>=40F', '>=50F', 'turns', 'TL%']
       .map((h) => h.padStart(8))
       .join(''),
 );
@@ -52,6 +52,10 @@ for (const r of results) {
         String(r.max),
         pct(r.shareAtLeast5),
         pct(r.shareAtLeast10),
+        pct(r.shareAtLeast20),
+        pct(r.shareAtLeast30),
+        pct(r.shareAtLeast40),
+        pct(r.shareAtLeast50),
         r.avgTurns.toFixed(1),
         pct(r.turnLimitRunRate),
       ]
@@ -60,7 +64,7 @@ for (const r of results) {
   );
 }
 
-const SHOWN_FLOORS = 10;
+const SHOWN_FLOORS = 20;
 console.log(`\n[층별 클리어율: 그 층에 도달한 판 중 승리한 비율 (도달 20판 미만은 -)]`);
 console.log(
   'policy'.padEnd(11) +
