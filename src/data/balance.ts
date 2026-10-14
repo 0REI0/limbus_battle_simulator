@@ -135,13 +135,13 @@ export const rewardCountForFloor = (floor: number): number =>
  *              rankWeights의 확률로 순위를 정해 그 순위의 선택지를 고른다
  */
 export const ENEMY = {
-  pickMode: 'random' as 'random' | 'rank',
+  pickMode: 'rank' as 'random' | 'rank',
   /**
    * 'rank' 모드에서 각 순위를 고를 가중치. 첫 값이 1순위(가장 좋은 선택지), 둘째가 2순위 ...
    * 예: [60, 30, 10] = 1순위 60%, 2순위 30%, 3순위 10%. [100] = 항상 가장 좋은 것.
    * 선택지 수보다 긴 부분은 무시하고 남은 순위끼리 비율을 다시 계산한다.
    */
-  rankWeights: [60, 30, 10] as number[],
+  rankWeights: [80, 15, 5] as number[],
 };
 
 // ------------------------------------------------------------
