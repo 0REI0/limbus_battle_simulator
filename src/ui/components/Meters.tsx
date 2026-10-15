@@ -29,7 +29,8 @@ export function SanityMeter({ sanity }: { sanity: number }) {
         <div className="sanity__fill" style={{ left: `${left}%`, width: `${width}%` }} />
       </div>
       <p className="sanity__text">
-        정신력 {sanity > 0 ? `+${sanity}` : sanity}, 앞면 확률 {headsPercent}%
+        <span>정신력 {sanity > 0 ? `+${sanity}` : sanity}</span>
+        <span>앞면 확률 {headsPercent}%</span>
       </p>
     </div>
   );

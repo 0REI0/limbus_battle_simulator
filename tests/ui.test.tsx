@@ -31,7 +31,7 @@ function playToGameOver(seed: number): RunState {
 describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는지 확인)', () => {
   it('앱의 첫 화면은 타이틀이다', () => {
     const html = render(<App />);
-    expect(html).toContain('림버스 오토 배틀 로그라이크');
+    expect(html).toContain('림버스 배틀 시뮬레이터');
     expect(html).toContain('게임 시작');
     expect(html).toContain('이 프로젝트는 Limbus Company(Project Moon)의 2차 창작 팬 프로젝트이며 비공식입니다.');
     expect(html).toContain(
@@ -61,7 +61,7 @@ describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는
     expect(html).toContain(`양쪽 체력은 모두 ${maxHpForFloor(1)}입니다.`);
   });
 
-  it('전투 화면은 재생 시작 전 상태(전투 시작)로 그려진다', () => {
+  it('전투 화면은 재생 시작 전 상태(전투 시작)로 그려지고, 요소가 정해진 순서로 놓인다', () => {
     const state = chooseReward(startRun(1), startRun(1).choices[0].id);
     const html = render(
       <BattleScreen
@@ -69,6 +69,8 @@ describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는
         skills={state.skills}
         enemySkills={state.enemySkills}
         battle={state.battle!}
+        speed={1}
+        onSpeedChange={noop}
         onContinue={noop}
       />,
     );
@@ -76,8 +78,17 @@ describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는
     expect(html).toContain('전투 시작');
     expect(html).toContain(`양쪽 체력은 ${maxHpForFloor(1)}입니다.`);
     expect(html).toContain('건너뛰기');
-    expect(html).toContain('양쪽 스킬 스펙 보기');
-    // 재생이 끝나기 전에는 다음 단계 버튼이 없다
+
+    // 배속/건너뛰기 → 체력·정신력 → 배틀 화면 → 양쪽 스킬 스펙 → 다음 층 버튼 자리 → 전투 로그
+    const order = ['class="controls"', 'class="fighters"', 'class="arena"', 'class="duo"', 'class="continue"', 'class="log"'];
+    const positions = order.map((marker) => html.indexOf(marker));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+
+    // 스킬 스펙은 접지 않고 항상 펼쳐져 있다
+    expect(html).not.toContain('<details');
+    // 재생이 끝나기 전에는 다음 단계 버튼 대신 비활성 버튼이 자리를 지킨다
+    expect(html).toContain('전투 진행 중');
     expect(html).not.toContain('다음 층으로');
     expect(html).not.toContain('결과 보기');
   });

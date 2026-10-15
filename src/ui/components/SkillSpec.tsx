@@ -1,4 +1,5 @@
-import { SKILL_TIERS, type SkillSet, type SkillStats } from '../../core/types';
+import { SKILL_TIERS, type Side, type SkillSet, type SkillStats, type SkillTier } from '../../core/types';
+import { DECK_COMPOSITION } from '../../data/balance';
 import { formatDelta } from '../format';
 import { CoinPips } from './Coin';
 
@@ -51,13 +52,39 @@ export function SpecDiff({ before, after }: { before: SkillStats; after: SkillSt
   );
 }
 
-/** 1/2/3스킬 스펙 목록 */
-export function SkillList({ skills }: { skills: SkillSet }) {
+/**
+ * 1/2/3스킬 스펙 목록.
+ * - side: 강조 색(플레이어 = 놋쇠, 적 = 장미)
+ * - active: 지금 사용 중인 스킬 (배경색으로 강조)
+ * - remaining: 스킬 묶음에 남은 각 스킬의 수 (주면 "남은 2/3"처럼 표시)
+ */
+export function SkillList({
+  skills,
+  side,
+  active = null,
+  remaining,
+}: {
+  skills: SkillSet;
+  side?: Side;
+  active?: SkillTier | null;
+  remaining?: Record<SkillTier, number>;
+}) {
   return (
-    <ul className="skills">
+    <ul className={side ? `skills skills--${side}` : 'skills'}>
       {SKILL_TIERS.map((tier) => (
-        <li key={tier} className="skills__row">
-          <span className="skills__tier">{tier}스킬</span>
+        <li
+          key={tier}
+          className={active === tier ? 'skills__row is-active' : 'skills__row'}
+          aria-current={active === tier ? 'true' : undefined}
+        >
+          <span className="skills__head">
+            <span className="skills__tier">{tier}스킬</span>
+            {remaining && (
+              <span className="skills__remain">
+                남은 {remaining[tier]}/{DECK_COMPOSITION[tier]}
+              </span>
+            )}
+          </span>
           <SkillSpec stats={skills[tier]} />
         </li>
       ))}

@@ -80,23 +80,25 @@ export function RewardScreen({
         ))}
       </ul>
 
-      <section className="panel">
-        <h2 className="panel__title">플레이어 스킬</h2>
-        <SkillList skills={state.skills} />
-        <p className="hint">
-          위력은 기본 + 코인 × 앞면 개수이고, 0 아래로는 내려가지 않습니다. 코인 개수는 합에서 버티는 횟수이자
-          공격 횟수입니다.
-        </p>
-      </section>
+      <div className="duo">
+        <section className="panel" aria-label="플레이어 스킬">
+          <h2 className="panel__title">플레이어 스킬</h2>
+          <SkillList side="player" skills={state.skills} />
+        </section>
+        <section className="panel panel--enemy" aria-label="이 층의 적 스킬">
+          <h2 className="panel__title">이 층의 적 스킬</h2>
+          <SkillList side="enemy" skills={state.enemySkills} />
+        </section>
+      </div>
 
-      <section className="panel panel--enemy">
-        <h2 className="panel__title">이 층의 적 스킬</h2>
-        <SkillList skills={state.enemySkills} />
-        <p className="hint">
-          적은 보상 {rewardCountForFloor(state.floor)}개를 받은 상태입니다. 양쪽 체력은 모두{' '}
-          {maxHpForFloor(state.floor)}입니다.
-        </p>
-      </section>
+      <p className="hint">
+        위력은 기본 + 코인 × 앞면 개수이고, 0 아래로는 내려가지 않습니다. 코인 개수는 합에서 버티는 횟수이자
+        공격 횟수입니다.
+      </p>
+      <p className="hint">
+        적은 보상 {rewardCountForFloor(state.floor)}개를 받은 상태입니다. 양쪽 체력은 모두{' '}
+        {maxHpForFloor(state.floor)}입니다.
+      </p>
     </section>
   );
 }

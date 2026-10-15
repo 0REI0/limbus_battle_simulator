@@ -18,6 +18,9 @@ function ScrollToTop() {
 export default function App() {
   const { state, start, choose, advance, quit } = useRun();
 
+  // 재생 배속은 층이 바뀌어도(전투 화면이 새로 마운트되어도) 유지한다
+  const [speed, setSpeed] = useState(1);
+
   // 이번 런을 시작할 때의 최고 기록. 게임 오버 때 "새 기록인가"를 비교하는 기준이기도 하다
   const [baseline, setBaseline] = useState(loadBest);
   const cleared = state === null ? 0 : floorsCleared(state);
@@ -52,6 +55,8 @@ export default function App() {
         skills={state.skills}
         enemySkills={state.enemySkills}
         battle={state.battle}
+        speed={speed}
+        onSpeedChange={setSpeed}
         onContinue={advance}
       />
     );

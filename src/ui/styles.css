@@ -113,6 +113,10 @@ button {
   line-height: 1.5;
 }
 
+.reward-screen > .hint {
+  margin-top: 0.7rem;
+}
+
 /* ---------- 버튼 ---------- */
 .btn {
   padding: 0.65rem 1.2rem;
@@ -287,18 +291,28 @@ button {
 }
 
 .sanity__text {
+  display: flex;
+  flex-direction: column;
   margin-top: 0.3rem;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+@media (min-width: 30rem) {
+  .sanity__text {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 0.4rem;
+    white-space: nowrap;
+  }
 }
 
 /* ---------- 스킬 스펙 ---------- */
 .skills__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 1rem;
-  padding: 0.45rem 0;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.5rem 0.55rem;
   border-bottom: 1px solid var(--line);
 }
 
@@ -306,9 +320,35 @@ button {
   border-bottom: 0;
 }
 
+.skills__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .skills__tier {
-  min-width: 3.2rem;
   font-weight: 600;
+}
+
+.skills__remain {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 지금 사용 중인 스킬: 배경색으로 강조 (플레이어 = 놋쇠, 적 = 장미) */
+.skills--player .skills__row.is-active {
+  background: rgba(217, 168, 74, 0.2);
+}
+
+.skills--enemy .skills__row.is-active {
+  background: rgba(217, 100, 90, 0.2);
+}
+
+.skills__row.is-active .skills__remain {
+  color: var(--text);
 }
 
 .spec {
@@ -329,15 +369,9 @@ button {
 }
 
 .panel {
-  margin-top: 1.5rem;
   padding: 1rem 1.1rem;
   background: var(--bg-raised);
   border: 1px solid var(--line);
-}
-
-.panel--enemy {
-  margin-top: 0.75rem;
-  border-left: 5px solid var(--rose);
 }
 
 .panel__title {
@@ -346,8 +380,32 @@ button {
   font-weight: 600;
 }
 
-.panel .hint {
-  margin-top: 0.6rem;
+/* 플레이어 / 적 스킬 패널을 좌우로 나란히 (보상 선택 화면, 전투 화면 공용) */
+.duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.duo .panel {
+  padding: 0.8rem 0.5rem;
+  border-top: 4px solid var(--brass);
+}
+
+.duo .panel--enemy {
+  border-top-color: var(--rose);
+}
+
+.duo .panel__title {
+  padding: 0 0.55rem;
+}
+
+/* 아주 좁은 화면에서만 위아래로 쌓는다 */
+@media (max-width: 20rem) {
+  .duo {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ---------- 층 머리말 ---------- */
@@ -524,130 +582,12 @@ button {
   gap: 0.75rem;
 }
 
-.fighter {
-  padding: 0.8rem 1rem;
-  background: var(--bg-raised);
-  border: 1px solid var(--line);
-  border-left: 5px solid var(--brass);
+.battle > .duo {
+  margin-top: 0.25rem;
 }
 
-.fighter--enemy {
-  border-left-color: var(--rose);
-}
-
-.fighter__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 0.4rem;
-}
-
-.fighter__name {
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.fighter__hp {
-  color: var(--muted);
-}
-
-.fighter__hp .num {
-  color: var(--text);
-  font-size: 1.5rem;
-}
-
-.fighter__skill {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.8rem;
-  margin-top: 0.6rem;
-  min-height: 1.6rem;
-}
-
-.chip {
-  padding: 0 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  border: 1px solid currentColor;
-}
-
-.fighter--player .chip { color: var(--brass); }
-.fighter--enemy .chip { color: var(--rose); }
-
-.arena {
-  display: grid;
-  place-items: center;
-  min-height: 15rem;
-  padding: 1rem 0.5rem;
-  border-block: 1px dashed var(--line);
-  text-align: center;
-}
-
-.arena__title {
-  font-family: var(--serif);
-  font-size: 2rem;
-  font-weight: 800;
-}
-
-.arena__note,
-.arena__caption {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.clash,
-.attack {
-  display: grid;
-  justify-items: center;
-  gap: 0.7rem;
-}
-
-.clash__row {
-  display: grid;
-  justify-items: center;
-  gap: 0.35rem;
-  opacity: 0.6;
-}
-
-.clash__row.is-leading {
-  opacity: 1;
-}
-
-.clash__power {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-}
-
-.clash__power .num {
-  font-size: 1.9rem;
-}
-
-.clash__row--player .num { color: var(--brass); }
-.clash__row--enemy .num { color: var(--rose); }
-
-.clash__calc {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.attack__damage {
-  font-size: 1.1rem;
-}
-
-.attack__number {
-  display: inline-block;
-  font-size: 2.6rem;
-  animation: hit-pop 0.3s ease-out;
-}
-
-.attack--player .attack__number { color: var(--brass); }
-.attack--enemy .attack__number { color: var(--rose); }
-
-@keyframes hit-pop {
-  from { transform: scale(1.5); opacity: 0.4; }
-  to { transform: none; opacity: 1; }
+.battle > .hint {
+  margin-top: -0.25rem;
 }
 
 .controls {
@@ -662,6 +602,180 @@ button {
   gap: 0.4rem;
 }
 
+/* 1) 체력 / 정신력: 플레이어 왼쪽, 적 오른쪽 */
+.fighters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.fighter {
+  padding: 0.7rem 0.8rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--brass);
+}
+
+.fighter--enemy {
+  border-top-color: var(--rose);
+}
+
+.fighter__head {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.4rem;
+  line-height: 1.3;
+}
+
+@media (min-width: 30rem) {
+  .fighter__head {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 0.5rem;
+  }
+}
+
+.fighter__name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.fighter__hp {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.fighter__hp .num {
+  color: var(--text);
+  font-size: 1.4rem;
+}
+
+/* 2) 배틀 화면: 높이를 고정해서 어떤 단계에서도 아래 항목들이 움직이지 않는다 */
+.arena {
+  display: grid;
+  place-items: center;
+  height: 16rem;
+  padding: 0.75rem 0.5rem;
+  border-block: 1px dashed var(--line);
+  text-align: center;
+  overflow: hidden;
+}
+
+.arena__title {
+  font-family: var(--serif);
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.arena__note,
+.arena__caption {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* 플레이어는 왼쪽 칸, 적은 오른쪽 칸 */
+.arena__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 0.75rem;
+  align-items: start;
+  justify-items: center;
+  width: 100%;
+}
+
+.arena__grid .arena__caption {
+  grid-column: 1 / -1;
+  margin-bottom: 0.4rem;
+}
+
+.arena__side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+}
+
+.arena__side.is-dim {
+  opacity: 0.55;
+}
+
+.arena__who {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.arena__side--player .arena__who { color: var(--brass); }
+.arena__side--enemy .arena__who { color: var(--rose); }
+
+/* 코인 영역은 크기별로 높이를 고정 (코인이 한 줄이든 두 줄이든 아래 내용이 움직이지 않는다) */
+.coin-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.coin-area--lg { height: 6rem; }
+.coin-area--md { height: 3.8rem; }
+.coin-area--sm { height: 2.2rem; }
+
+.arena__power {
+  display: grid;
+  justify-items: center;
+  line-height: 1.2;
+}
+
+.arena__power .num {
+  font-size: 1.9rem;
+}
+
+.arena__side--player .arena__power .num { color: var(--brass); }
+.arena__side--enemy .arena__power .num { color: var(--rose); }
+
+.arena__calc {
+  min-height: 1.3em;
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.arena__damage {
+  min-height: 3rem;
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.arena__number {
+  display: inline-block;
+  font-size: 2.6rem;
+  animation: hit-pop 0.3s ease-out;
+}
+
+.arena__side--player .arena__number { color: var(--brass); }
+.arena__side--enemy .arena__number { color: var(--rose); }
+
+@keyframes hit-pop {
+  from { transform: scale(1.5); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+
+/* 4) 다음 층으로 */
+.continue .btn {
+  width: 100%;
+}
+
+.btn:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.btn:disabled:hover {
+  background: transparent;
+}
+
+/* 5) 전투 로그 */
 .log {
   max-height: 11rem;
   overflow-y: auto;
@@ -681,27 +795,15 @@ button {
   color: var(--text);
 }
 
-.specs summary {
-  cursor: pointer;
-  color: var(--muted);
-}
-
-.specs__grid {
-  display: grid;
-  gap: 1rem;
-  margin-top: 0.6rem;
-}
-
-.specs__who {
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
 /* ---------- 게임 오버 ---------- */
 .gameover {
   display: grid;
   gap: 0.7rem;
   padding-top: 1.5rem;
+}
+
+.gameover .panel {
+  margin-top: 0.8rem;
 }
 
 .gameover__where {
@@ -758,10 +860,6 @@ button {
 @media (min-width: 40rem) {
   .title__name {
     font-size: 2.6rem;
-  }
-
-  .specs__grid {
-    grid-template-columns: 1fr 1fr;
   }
 }
 

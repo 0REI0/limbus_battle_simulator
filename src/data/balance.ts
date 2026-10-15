@@ -95,12 +95,12 @@ export const REWARD_TABLE: Record<RewardTier, RewardEffect[][]> = {
   4: [
     [count(1, 1), power(1, -2)],
     [count(2, 1), power(2, -1)],
-    [count(3, 1)],
+    [count(3, 1), power(3, 1)],
   ],
   5: [
     [count(1, 1), power(1, -1)],
     [count(2, 1)],
-    [count(3, 1), power(3, 1)],
+    [count(3, 1), power(3, 2)],
   ],
 };
 

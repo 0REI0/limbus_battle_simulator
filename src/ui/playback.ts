@@ -14,7 +14,7 @@ import type {
   Side,
   SkillTier,
 } from '../core/types';
-import { COIN } from '../data/balance';
+import { COIN, DECK_COMPOSITION } from '../data/balance';
 
 /** ready: 전투 시작 전 / skills: 스킬 공개 / clash: 합 진행 / clashEnd: 합 결과 / stalemate: 합 무승부 / attack: 공격 / end: 종료 */
 export type Stage = 'ready' | 'skills' | 'clash' | 'clashEnd' | 'stalemate' | 'attack' | 'end';
@@ -44,6 +44,8 @@ export interface BattleView {
   sanity: Record<Side, number>;
   /** 이번 턴에 양측이 쓰는 스킬 */
   tiers: Record<Side, SkillTier | null>;
+  /** 양측의 스킬 묶음에 아직 남은 스킬 수 (이번 턴에 뽑은 스킬은 이미 빠진 상태) */
+  deck: Record<Side, Record<SkillTier, number>>;
   /** 합 도중/직후 남은 코인 개수 */
   coinsLeft: Record<Side, number | null>;
   clash: ClashView | null;
@@ -84,12 +86,22 @@ export function initialView(maxHp: number, initialSanity: number = COIN.initialS
     maxHp,
     sanity: { player: initialSanity, enemy: initialSanity },
     tiers: { player: null, enemy: null },
+    deck: { player: { ...DECK_COMPOSITION }, enemy: { ...DECK_COMPOSITION } },
     coinsLeft: { player: null, enemy: null },
     clash: null,
     clashWinner: null,
     attack: null,
     end: null,
   };
+}
+
+/**
+ * 이번 턴에 tier를 뽑은 뒤 묶음에 남은 스킬 수.
+ * 묶음이 비어 있었다면 새 묶음(DECK_COMPOSITION)에서 뽑은 것으로 본다 (battle.ts의 drawSkill과 같은 규칙).
+ */
+function drawFromDeck(deck: Record<SkillTier, number>, tier: SkillTier): Record<SkillTier, number> {
+  const source = deck[1] + deck[2] + deck[3] === 0 ? DECK_COMPOSITION : deck;
+  return { ...source, [tier]: Math.max(0, source[tier] - 1) };
 }
 
 /** 이벤트 배열 → 프레임 배열. 첫 프레임은 아무 일도 일어나기 전의 초기 화면이다. */
@@ -110,6 +122,10 @@ export function buildFrames(events: readonly BattleEvent[], maxHp: number): Fram
             stage: 'skills',
             turn: e.turn,
             tiers: { player: e.playerTier, enemy: e.enemyTier },
+            deck: {
+              player: drawFromDeck(view.deck.player, e.playerTier),
+              enemy: drawFromDeck(view.deck.enemy, e.enemyTier),
+            },
             coinsLeft: { player: null, enemy: null },
             clash: null,
             clashWinner: null,

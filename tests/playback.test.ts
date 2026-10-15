@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createCombatant, runBattle } from '../src/core/battle';
 import { createRng } from '../src/core/rng';
 import type { BattleEvent } from '../src/core/types';
-import { BASE_SKILLS, MAX_TURNS_PER_BATTLE, maxHpForFloor } from '../src/data/balance';
+import { BASE_SKILLS, DECK_COMPOSITION, MAX_TURNS_PER_BATTLE, maxHpForFloor } from '../src/data/balance';
 import { buildFrames, initialView } from '../src/ui/playback';
 
 /** 손으로 만든 이벤트: 플레이어가 합에서 이기고 2번 타격해 적 체력이 100 → 71이 되는 한 턴 */
@@ -173,6 +173,71 @@ describe('buildFrames: 로그 문구', () => {
     expect(logs[1]).toMatch(/무승부$/);
     expect(logs[2]).toMatch(/적이 우세$/);
     expect(logs[3]).toBe('적 정신력 0 → 5 (앞면 확률 55%)');
+  });
+});
+
+describe('buildFrames: 묶음에 남은 스킬 수', () => {
+  const turn = (n: number, p: 1 | 2 | 3, e: 1 | 2 | 3): BattleEvent => ({
+    type: 'turnStart',
+    turn: n,
+    playerTier: p,
+    enemyTier: e,
+  });
+  const deckAfter = (events: BattleEvent[]) => buildFrames(events, 100).map((f) => f.view.deck);
+
+  it('처음에는 묶음이 가득 차 있다 (1스킬 3, 2스킬 2, 3스킬 1)', () => {
+    expect(initialView(100).deck.player).toEqual({ 1: 3, 2: 2, 3: 1 });
+    expect(initialView(100).deck.enemy).toEqual({ 1: 3, 2: 2, 3: 1 });
+  });
+
+  it('스킬을 뽑을 때마다 양쪽 각자의 묶음에서 그 스킬만 하나 줄어든다', () => {
+    const decks = deckAfter([turn(1, 1, 3), turn(2, 1, 2)]);
+    expect(decks[1].player).toEqual({ 1: 2, 2: 2, 3: 1 });
+    expect(decks[1].enemy).toEqual({ 1: 3, 2: 2, 3: 0 });
+    expect(decks[2].player).toEqual({ 1: 1, 2: 2, 3: 1 });
+    expect(decks[2].enemy).toEqual({ 1: 3, 2: 1, 3: 0 });
+  });
+
+  it('6번 뽑으면 묶음이 비고, 7번째 턴에는 새 묶음에서 뽑은 것으로 계산한다', () => {
+    // 플레이어: 1, 1, 1, 2, 2, 3 / 적: 3, 2, 1, 1, 2, 1 (둘 다 묶음 구성 3:2:1에 맞는 순서)
+    const events = [
+      turn(1, 1, 3),
+      turn(2, 1, 2),
+      turn(3, 1, 1),
+      turn(4, 2, 1),
+      turn(5, 2, 2),
+      turn(6, 3, 1),
+      turn(7, 2, 1),
+    ];
+    const decks = deckAfter(events);
+    expect(decks[6].player).toEqual({ 1: 0, 2: 0, 3: 0 });
+    expect(decks[6].enemy).toEqual({ 1: 0, 2: 0, 3: 0 });
+    expect(decks[7].player).toEqual({ 1: 3, 2: 1, 3: 1 }); // 새 묶음에서 2스킬을 뽑음
+    expect(decks[7].enemy).toEqual({ 1: 2, 2: 2, 3: 1 }); // 적도 새 묶음에서 1스킬을 뽑음
+  });
+
+  it('입력으로 받은 묶음 구성(DECK_COMPOSITION)을 바꾸지 않는다', () => {
+    deckAfter([turn(1, 1, 1), turn(2, 2, 2)]);
+    expect(DECK_COMPOSITION).toEqual({ 1: 3, 2: 2, 3: 1 });
+  });
+
+  it('실제 전투 300판에서 남은 수는 매 턴 일관된다', () => {
+    const total = (d: Record<1 | 2 | 3, number>) => d[1] + d[2] + d[3];
+    for (let seed = 1; seed <= 300; seed++) {
+      const rng = createRng(seed);
+      const result = runBattle(createCombatant(BASE_SKILLS, 1, rng), createCombatant(BASE_SKILLS, 1, rng), rng);
+      for (const f of buildFrames(result.events, maxHpForFloor(1))) {
+        if (f.view.stage !== 'skills') continue; // 턴 시작 프레임
+        const expectedTotal = 6 - (((f.view.turn - 1) % 6) + 1);
+        for (const side of ['player', 'enemy'] as const) {
+          expect(total(f.view.deck[side])).toBe(expectedTotal);
+          for (const tier of [1, 2, 3] as const) {
+            expect(f.view.deck[side][tier]).toBeGreaterThanOrEqual(0);
+            expect(f.view.deck[side][tier]).toBeLessThanOrEqual(DECK_COMPOSITION[tier]);
+          }
+        }
+      }
+    }
   });
 });
 
