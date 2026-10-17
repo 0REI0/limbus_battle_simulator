@@ -2,17 +2,39 @@
 // data/balance.ts - 밸런스 수치는 전부 여기서만 관리한다.
 // ============================================================
 
-import type { RewardEffect, RewardTier, SkillSet, SkillTier } from '../core/types';
+import type {
+  AmountFormula,
+  RewardAmount,
+  RewardEffect,
+  RewardTier,
+  SanityRules,
+  SkillSet,
+  SkillStatKey,
+  SkillTier,
+  UnitSpec,
+} from '../core/types';
 
 // ------------------------------------------------------------
 // 기본 스펙
 // ------------------------------------------------------------
 
 export const BASE_SKILLS: SkillSet = {
-  1: { basePower: 4, coinPower: 7, coinCount: 1 },
-  2: { basePower: 4, coinPower: 5, coinCount: 2 },
-  3: { basePower: 4, coinPower: 3, coinCount: 3 },
+  1: { basePower: 4, coinPower: 7, coinCount: 1, sanityOnUse: 0 },
+  2: { basePower: 4, coinPower: 5, coinCount: 2, sanityOnUse: 0 },
+  3: { basePower: 4, coinPower: 3, coinCount: 3, sanityOnUse: 0 },
 };
+
+/**
+ * 플레이어/적 본체의 기본 정신력 규칙 (COIN의 값). 보상으로 각자 바뀔 수 있다.
+ * COIN 값을 실행 중에 바꿔도(시뮬레이션 옵션) 반영되도록 호출할 때마다 새로 만든다.
+ */
+export const baseSanityRules = (): SanityRules => ({
+  sanityOnClashWin: COIN.sanityOnClashWin,
+  sanityOnClashLose: COIN.sanityOnClashLose,
+});
+
+/** 플레이어/적의 시작 스펙 (보상을 받기 전) */
+export const baseSpec = (): UnitSpec => ({ skills: BASE_SKILLS, sanity: baseSanityRules() });
 
 /** 층별 최대 체력: 100 + 층수 * 10. 플레이어/적 공통, 보상으로 변하지 않음 */
 export const maxHpForFloor = (floor: number): number => 100 + floor * 10;
@@ -57,10 +79,38 @@ export const COIN = {
 
 export const REWARD_TIERS: readonly RewardTier[] = [1, 2, 3, 4, 5];
 
-// 표를 읽기 쉽게 만드는 도우미
-const base = (skill: SkillTier, amount: number): RewardEffect => ({ skillTier: skill, stat: 'basePower', amount });
-const power = (skill: SkillTier, amount: number): RewardEffect => ({ skillTier: skill, stat: 'coinPower', amount });
-const count = (skill: SkillTier, amount: number): RewardEffect => ({ skillTier: skill, stat: 'coinCount', amount });
+// ---- 보상표를 읽기 쉽게 만드는 도우미 ----
+// 수치(amount)는 숫자이거나, 그 스킬의 현재 스탯을 참조하는 식(ref / scale)이다.
+//
+//   base(1, 2)                         1스킬 기본 위력 +2
+//   power(2, -1)                       2스킬 코인 위력 -1
+//   count(3, 1)                        3스킬 코인 개수 +1
+//   onUse(1, 2)                        1스킬 사용 시(합 직전) 정신력 +2
+//   win(2) / lose(-1)                  합 승리 시 정신력 +2 / 합 패배 시 정신력 -1 (플레이어/적 본체에 적용)
+//   base(1, ref('coinCount'))          1스킬 기본 위력 +(코인 개수)
+//   base(1, ref('coinCount', 'coinPower'))   1스킬 기본 위력 +(코인 개수 × 코인 위력)
+//   power(1, scale(-2, 'coinPower'))   1스킬 코인 위력 -(코인 위력 × 2)
+//
+// 한 보상 안의 모든 효과는 보상을 적용하기 "전"의 스탯으로 계산한다.
+// 예) [base(1, ref('coinCount')), count(1, 1)] 에서 기본 위력 증가량은 코인 개수가 늘어나기 전의 값이다.
+
+const skillEffect =
+  (stat: SkillStatKey) =>
+  (skill: SkillTier, amount: RewardAmount): RewardEffect => ({ skillTier: skill, stat, amount });
+
+export const base = skillEffect('basePower');
+export const power = skillEffect('coinPower');
+export const count = skillEffect('coinCount');
+export const onUse = skillEffect('sanityOnUse');
+
+export const win = (amount: number): RewardEffect => ({ rule: 'sanityOnClashWin', amount });
+export const lose = (amount: number): RewardEffect => ({ rule: 'sanityOnClashLose', amount });
+
+/** 스탯 참조 식: +(스탯들의 곱). 예: ref('coinCount'), ref('coinCount', 'coinPower') */
+export const ref = (...of: SkillStatKey[]): AmountFormula => ({ factor: 1, of });
+
+/** 계수가 붙은 스탯 참조 식: factor * (스탯들의 곱). 예: scale(-2, 'coinPower') = -(코인 위력 × 2) */
+export const scale = (factor: number, ...of: SkillStatKey[]): AmountFormula => ({ factor, of });
 
 /**
  * 티어별 보상 목록. 보상 하나 = 효과들의 배열.
@@ -69,48 +119,52 @@ const count = (skill: SkillTier, amount: number): RewardEffect => ({ skillTier: 
  */
 export const REWARD_TABLE: Record<RewardTier, RewardEffect[][]> = {
   1: [
-    [power(1, 1)],
-    [power(2, 1)],
-    [power(3, 1)],
-    [base(1, 1), power(1, -1)],
-    [base(2, 1), power(2, -1)],
-    [base(3, 2), power(3, -1)],
-  ],
-  2: [
     [base(1, 1)],
     [base(2, 1)],
     [base(3, 2)],
-    [base(1, 2), power(1, -1)],
-    [base(2, 2), power(2, -1)],
-    [base(3, 3), power(3, -1)],
+    [base(1, ref('coinCount')), power(1, -1)],
+    [base(2, ref('coinCount')), power(2, -1)],
+    [base(3, ref('coinCount')), power(3, -1)],
+  ],
+  2: [
+    [power(1, 1)],
+    [power(2, 1)],
+    [power(3, 1)],
+    [base(1, scale(2, 'coinCount')), power(1, -2)],
+    [base(2, scale(2, 'coinCount')), power(2, -2)],
+    [base(3, scale(2, 'coinCount')), power(3, -2)],
   ],
   3: [
-    [power(1, 2)],
-    [power(2, 2)],
-    [power(3, 2)],
     [base(1, 2)],
     [base(2, 2)],
     [base(3, 3)],
-  ],
-  4: [
     [count(1, 1), power(1, -2)],
     [count(2, 1), power(2, -1)],
+    [count(3, 1)],
+  ],
+  4: [
+    [power(1, 2)],
+    [power(2, 2)],
+    [power(3, 2)],
+    [count(1, 1), power(1, -1)],
+    [count(2, 1)],
     [count(3, 1), power(3, 1)],
   ],
   5: [
-    [count(1, 1), power(1, -1)],
-    [count(2, 1)],
-    [count(3, 1), power(3, 2)],
+    [onUse(1, 5), onUse(2, 7), onUse(3, 10)],
+    [base(1, ref('coinCount', 'coinPower')), power(1, scale(-2, 'coinPower')), onUse(1, -7),
+      base(2, ref('coinCount', 'coinPower')), power(2, scale(-2, 'coinPower')), onUse(2, -10),
+      base(3, ref('coinCount', 'coinPower')), power(3, scale(-2, 'coinPower')), onUse(3, -15),],
   ],
 };
 
 /** 보상 티어 등장 가중치 (높은 티어일수록 낮음). 시뮬레이션으로 조정 */
 export const REWARD_TIER_WEIGHTS: Record<RewardTier, number> = {
-  1: 35,
+  1: 33,
   2: 30,
   3: 20,
-  4: 10,
-  5: 5,
+  4: 15,
+  5: 2,
 };
 
 export const REWARDS = {
@@ -131,7 +185,7 @@ export const rewardCountForFloor = (floor: number): number =>
  * 적이 보상을 받는 방식. 적은 층수 * n 번의 보상을 받는다 (rewardCountForFloor).
  *  - 'random': 보상 풀에서 무작위로 하나씩 (선택지 없이)
  *  - 'rank'  : 플레이어와 같은 방식으로 선택지(REWARDS.choicesPerPick개)를 받고,
- *              기대 순이득(core/evaluate.ts의 skillSetValue)이 높은 순으로 정렬한 뒤
+ *              기대 순이득(core/evaluate.ts의 specValue)이 높은 순으로 정렬한 뒤
  *              rankWeights의 확률로 순위를 정해 그 순위의 선택지를 고른다
  */
 export const ENEMY = {

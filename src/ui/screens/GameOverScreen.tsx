@@ -2,7 +2,7 @@ import { describeReward } from '../../core/rewards';
 import { floorsCleared, type RunState } from '../../core/run';
 import { MAX_TURNS_PER_BATTLE, REWARDS } from '../../data/balance';
 import { TierPips } from '../components/Meters';
-import { SkillList } from '../components/SkillSpec';
+import { SanityRulesText, SkillList } from '../components/SkillSpec';
 
 export function GameOverScreen({
   state,
@@ -59,7 +59,8 @@ export function GameOverScreen({
 
       <section className="panel">
         <h2 className="panel__title">최종 스킬</h2>
-        <SkillList skills={state.skills} />
+        <SkillList skills={state.player.skills} />
+        <SanityRulesText rules={state.player.sanity} />
       </section>
 
       <p className="hint">시드 {state.seed}</p>

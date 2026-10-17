@@ -308,6 +308,10 @@ button {
   }
 }
 
+.sanity__text.sanity__text--rules {
+  margin-top: 0.1rem;
+}
+
 /* ---------- 스킬 스펙 ---------- */
 .skills__row {
   display: grid;
@@ -372,6 +376,15 @@ button {
   padding: 1rem 1.1rem;
   background: var(--bg-raised);
   border: 1px solid var(--line);
+}
+
+.rules {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.55rem 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .panel__title {
@@ -546,6 +559,12 @@ button {
   gap: 0.15rem;
   font-size: 1.05rem;
   font-weight: 600;
+}
+
+.reward__now {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 400;
 }
 
 .delta {

@@ -5,10 +5,19 @@
 //  - 특정 전략이 압도적이면 → 그 보상이 너무 강한 것 (밸런스 조정 대상)
 // ============================================================
 
-import { applyReward } from '../src/core/rewards';
+import { applyReward, resolveAmount } from '../src/core/rewards';
 import type { RunState } from '../src/core/run';
-import type { Reward, Rng, SkillSet, SkillStatKey, SkillTier } from '../src/core/types';
-import { BASE_SKILLS, DECK_COMPOSITION } from '../src/data/balance';
+import {
+  isSanityRuleEffect,
+  type Reward,
+  type RewardEffect,
+  type Rng,
+  type SkillSet,
+  type SkillStatKey,
+  type SkillTier,
+  type UnitSpec,
+} from '../src/core/types';
+import { DECK_COMPOSITION, baseSpec } from '../src/data/balance';
 import { expectedAttackDamage, turnExpectation } from '../src/core/evaluate';
 
 export interface Policy {
@@ -47,14 +56,25 @@ export function expectedDamage(skills: SkillSet): number {
   return total;
 }
 
-const STAT_RANK: Record<SkillStatKey, number> = { basePower: 0, coinPower: 1, coinCount: 2 };
+const STAT_RANK: Record<SkillStatKey, number> = { basePower: 0, coinPower: 1, coinCount: 2, sanityOnUse: 0 };
 
-const touches = (r: Reward, tier: SkillTier) => r.effects.some((e) => e.skillTier === tier);
+/** 효과의 실제 증감값 (스탯 참조 식은 현재 스펙의 스탯으로 계산) */
+const effectAmount = (e: RewardEffect, spec: UnitSpec): number =>
+  isSanityRuleEffect(e) ? e.amount : resolveAmount(e.amount, spec.skills[e.skillTier]);
+
+const touches = (r: Reward, tier: SkillTier) =>
+  r.effects.some((e) => !isSanityRuleEffect(e) && e.skillTier === tier);
 /** 증가시키는 수치들의 합 (감소 효과는 제외) */
-const gainSum = (r: Reward) => r.effects.reduce((sum, e) => sum + Math.max(0, e.amount), 0);
-/** 증가시키는 스탯 중 가장 "높은" 종류 (코인 개수 > 코인 위력 > 기본 위력) */
-const topStatRank = (r: Reward) =>
-  Math.max(-1, ...r.effects.filter((e) => e.amount > 0).map((e) => STAT_RANK[e.stat]));
+const gainSum = (r: Reward, spec: UnitSpec) =>
+  r.effects.reduce((sum, e) => sum + Math.max(0, effectAmount(e, spec)), 0);
+/** 증가시키는 스킬 스탯 중 가장 "높은" 종류 (코인 개수 > 코인 위력 > 기본 위력). 정신력 규칙 효과는 제외 */
+const topStatRank = (r: Reward, spec: UnitSpec) =>
+  Math.max(
+    -1,
+    ...r.effects
+      .filter((e) => !isSanityRuleEffect(e) && effectAmount(e, spec) > 0)
+      .map((e) => (isSanityRuleEffect(e) ? -1 : STAT_RANK[e.stat])),
+  );
 
 export const POLICIES: Policy[] = [
   {
@@ -71,19 +91,19 @@ export const POLICIES: Policy[] = [
     name: 'skill1',
     description: '1스킬 강화 우선',
     pick: (state, rng) =>
-      pickBest(state.choices, (r) => (touches(r, 1) ? 1000 : 0) + gainSum(r), rng),
+      pickBest(state.choices, (r) => (touches(r, 1) ? 1000 : 0) + gainSum(r, state.player), rng),
   },
   {
     name: 'skill3',
     description: '3스킬 강화 우선',
     pick: (state, rng) =>
-      pickBest(state.choices, (r) => (touches(r, 3) ? 1000 : 0) + gainSum(r), rng),
+      pickBest(state.choices, (r) => (touches(r, 3) ? 1000 : 0) + gainSum(r, state.player), rng),
   },
   {
     name: 'coinCount',
     description: '코인 개수 > 코인 위력 > 기본 위력 순으로 우선',
     pick: (state, rng) =>
-      pickBest(state.choices, (r) => topStatRank(r) * 1000 + gainSum(r), rng),
+      pickBest(state.choices, (r) => topStatRank(r, state.player) * 1000 + gainSum(r, state.player), rng),
   },
   {
     name: 'greedyDmg',
@@ -91,7 +111,7 @@ export const POLICIES: Policy[] = [
     pick: (state, rng) =>
       pickBest(
         state.choices,
-        (r) => expectedDamage(applyReward(state.skills, r)) - expectedDamage(state.skills),
+        (r) => expectedDamage(applyReward(state.player, r).skills) - expectedDamage(state.player.skills),
         rng,
       ),
   },
@@ -101,7 +121,7 @@ export const POLICIES: Policy[] = [
     pick: (state, rng) =>
       pickBest(
         state.choices,
-        (r) => turnExpectation(applyReward(state.skills, r), BASE_SKILLS).net,
+        (r) => turnExpectation(applyReward(state.player, r), baseSpec()).net,
         rng,
       ),
   },

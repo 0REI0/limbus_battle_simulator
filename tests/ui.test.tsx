@@ -2,7 +2,18 @@ import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { describeReward } from '../src/core/rewards';
 import { advanceFloor, chooseReward, startRun, type RunState } from '../src/core/run';
-import { maxHpForFloor } from '../src/data/balance';
+import {
+  REWARD_TABLE,
+  REWARD_TIERS,
+  base,
+  baseSanityRules,
+  lose,
+  maxHpForFloor,
+  power,
+  ref,
+  onUse,
+  win,
+} from '../src/data/balance';
 import App from '../src/ui/App';
 import { Coin, CoinRow } from '../src/ui/components/Coin';
 import { SanityMeter } from '../src/ui/components/Meters';
@@ -32,6 +43,7 @@ describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는
   it('앱의 첫 화면은 타이틀이다', () => {
     const html = render(<App />);
     expect(html).toContain('림버스 오토 배틀 로그라이크');
+    expect(html).not.toContain('림버스 배틀 시뮬레이터');
     expect(html).toContain('게임 시작');
     expect(html).toContain('이 프로젝트는 Limbus Company(Project Moon)의 2차 창작 팬 프로젝트이며 비공식입니다.');
     expect(html).toContain(
@@ -66,8 +78,8 @@ describe('화면 렌더링 (서버 렌더링으로 크래시 없이 그려지는
     const html = render(
       <BattleScreen
         floor={state.floor}
-        skills={state.skills}
-        enemySkills={state.enemySkills}
+        player={state.player}
+        enemy={state.enemy}
         battle={state.battle!}
         speed={1}
         onSpeedChange={noop}
@@ -129,8 +141,8 @@ describe('작은 컴포넌트', () => {
   });
 
   it('정신력 표시는 앞면 확률을 함께 보여준다', () => {
-    expect(render(<SanityMeter sanity={5} />)).toContain('앞면 확률 55%');
-    expect(render(<SanityMeter sanity={-45} />)).toContain('앞면 확률 5%');
+    expect(render(<SanityMeter sanity={5} rules={baseSanityRules()} />)).toContain('앞면 확률 55%');
+    expect(render(<SanityMeter sanity={-45} rules={baseSanityRules()} />)).toContain('앞면 확률 5%');
   });
 
   it('증감 숫자 표기: 음수는 수학 마이너스를 쓴다', () => {
@@ -177,5 +189,81 @@ describe('최고 기록 저장', () => {
     expect(loadBest()).toBe(0);
     store.set('limbus_battle_simulator:best-floors', '-3');
     expect(loadBest()).toBe(0);
+  });
+});
+
+describe('보상 선택 화면: 정신력 / 스탯 참조 보상 표시', () => {
+  const original = { ...REWARD_TABLE };
+  afterEach(() => {
+    for (const tier of REWARD_TIERS) REWARD_TABLE[tier] = original[tier];
+  });
+
+  /** 1티어에 보상 3개만 두고 나머지는 비운다 → 선택지는 항상 이 3개 */
+  const useCustomTable = () => {
+    for (const tier of REWARD_TIERS) REWARD_TABLE[tier] = [];
+    REWARD_TABLE[1] = [
+      [base(1, ref('coinCount')), power(1, -1)], // 스탯 참조 식
+      [onUse(2, 2), win(3)], // 사용 시 정신력 + 합 승리 정신력
+      [lose(-4)], // 합 패배 정신력
+    ];
+  };
+
+  it('스탯 참조 식은 식과 현재 값을 함께 보여준다', () => {
+    useCustomTable();
+    const html = render(<RewardScreen state={startRun(1)} onChoose={noop} />);
+    expect(html).toContain('+(코인 개수)');
+    expect(html).toContain('(현재 +1)'); // 1스킬 코인 개수 1
+    expect(html).toContain('코인 위력 <b class="delta delta--down">\u22121</b>');
+  });
+
+  it('정신력 보상은 효과 줄과 적용 전후 비교를 보여준다', () => {
+    useCustomTable();
+    const html = render(<RewardScreen state={startRun(1)} onChoose={noop} />);
+    // 효과 줄
+    expect(html).toContain('2스킬 사용시 정신력 <b class="delta delta--up">+2</b>');
+    expect(html).toContain('합 승리시 정신력 <b class="delta delta--up">+3</b>');
+    expect(html).toContain('합 패배시 정신력 <b class="delta delta--down">\u22124</b>');
+    // 적용 전후 비교: 사용 시 정신력은 0이 아니게 되는 스킬만, 규칙은 바뀌는 수치만 강조
+    expect(html).toContain('사용시 정신력 <b class="spec__changed">+0→+2</b>');
+    expect(html).toContain('합 승리시 <b class="spec__changed">+5→+8</b>');
+    expect(html).toContain('합 패배시 <b class="spec__changed">0→\u22124</b>');
+  });
+
+  it('접근성 이름(aria-label)에도 효과가 읽힌다', () => {
+    useCustomTable();
+    const html = render(<RewardScreen state={startRun(1)} onChoose={noop} />);
+    expect(html).toContain('aria-label="등급 1: 1스킬 기본 위력 +(코인 개수) / 1스킬 코인 위력 -1"');
+    expect(html).toContain('aria-label="등급 1: 2스킬 사용시 정신력 +2 / 합 승리시 정신력 +3"');
+  });
+
+  it('플레이어/적 스킬 패널 아래에 정신력 증감 규칙이 표시된다', () => {
+    const state = startRun(1);
+    const html = render(<RewardScreen state={state} onChoose={noop} />);
+    const rules = (r: { sanityOnClashWin: number; sanityOnClashLose: number }) =>
+      `정신력: 합 승리시 ${r.sanityOnClashWin === 0 ? '0' : `+${r.sanityOnClashWin}`}, 합 패배시 ${r.sanityOnClashLose === 0 ? '0' : `+${r.sanityOnClashLose}`}`;
+    expect(html).toContain(rules(state.player.sanity)); // 기본: 합 승리시 +5, 합 패배시 0
+    expect(html).toContain('정신력: 합 승리시 +5, 합 패배시 0');
+    // 두 패널(플레이어, 적) 모두에 규칙 줄이 있다
+    expect((html.match(/class="rules"/g) ?? []).length).toBe(2);
+  });
+
+  it('스킬의 사용 시 정신력은 0이 아닐 때만 스킬 스펙에 나온다', () => {
+    const plain = render(<RewardScreen state={startRun(1)} onChoose={noop} />);
+    expect(plain).not.toContain('사용시 정신력 <b>');
+
+    const state = startRun(1);
+    const boosted = {
+      ...state,
+      player: { ...state.player, skills: { ...state.player.skills, 2: { ...state.player.skills[2], sanityOnUse: 3 } } },
+    };
+    const html = render(<RewardScreen state={boosted} onChoose={noop} />);
+    // 플레이어 스킬 패널 안에서는 2스킬 한 줄에만 나온다 (보상 카드 미리보기에도 그 스킬이 나오므로 패널만 본다)
+    const start = html.indexOf('aria-label="플레이어 스킬"');
+    const end = html.indexOf('aria-label="이 층의 적 스킬"');
+    const playerPanel = html.slice(start, end);
+    expect(playerPanel).toContain('사용시 정신력 <b>+3</b>');
+    expect((playerPanel.match(/사용시 정신력 <b>/g) ?? []).length).toBe(1);
+
+    // 0이면 어디에도 나오지 않는다 (위의 plain 확인)
   });
 });

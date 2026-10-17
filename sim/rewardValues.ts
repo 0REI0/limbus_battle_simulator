@@ -15,7 +15,7 @@
 import { applyReward, describeReward, getRewardPool, rewardId } from '../src/core/rewards';
 import type { Reward, RewardEffect, RewardTier, SkillTier } from '../src/core/types';
 import {
-  BASE_SKILLS,
+  baseSpec,
   REWARD_TABLE,
   REWARD_TIERS,
   REWARD_TIER_WEIGHTS,
@@ -33,14 +33,14 @@ interface Evaluated {
   net: number;
 }
 
-const baseDmg = expectedDamage(BASE_SKILLS);
+const baseDmg = expectedDamage(baseSpec().skills);
 
 function evaluate(reward: Reward): Evaluated {
-  const skills = applyReward(BASE_SKILLS, reward);
+  const spec = applyReward(baseSpec(), reward);
   return {
     reward,
-    dmg: expectedDamage(skills) - baseDmg,
-    net: turnExpectation(skills, BASE_SKILLS).net * DECK_SIZE,
+    dmg: expectedDamage(spec.skills) - baseDmg,
+    net: turnExpectation(spec, baseSpec()).net * DECK_SIZE,
   };
 }
 

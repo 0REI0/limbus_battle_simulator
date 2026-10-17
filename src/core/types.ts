@@ -34,11 +34,34 @@ export interface SkillStats {
   basePower: number; // 기본 위력
   coinPower: number; // 코인 위력 (음수 가능: 마이너스 코인)
   coinCount: number; // 코인 개수
+  /**
+   * 이 스킬을 사용할 때 사용한 쪽의 정신력이 변하는 양 (음수 가능).
+   * 스킬이 정해진 직후, 합이 시작되기 직전에 적용된다.
+   */
+  sanityOnUse: number;
 }
 export type SkillStatKey = keyof SkillStats;
 
-/** 1/2/3스킬 세트. 플레이어/적의 "성장하는 스펙"은 이것 하나뿐이다. */
+/** 1/2/3스킬 세트 */
 export type SkillSet = Record<SkillTier, SkillStats>;
+
+/**
+ * 플레이어/적 "본체"에 적용되는 정신력 증감 규칙. 스킬과 무관하게 합의 결과에 따라 적용된다.
+ * (스킬을 쓸 때의 증감은 스킬 스탯 sanityOnUse)
+ */
+export interface SanityRules {
+  /** 합에서 이겼을 때 정신력 변화량 */
+  sanityOnClashWin: number;
+  /** 합에서 졌을 때 정신력 변화량 */
+  sanityOnClashLose: number;
+}
+export type SanityRuleKey = keyof SanityRules;
+
+/** 플레이어/적의 "성장하는 스펙" 전체: 스킬 + 정신력 규칙. 보상은 이것을 바꾼다. */
+export interface UnitSpec {
+  skills: SkillSet;
+  sanity: SanityRules;
+}
 
 // ------------------------------------------------------------
 // 전투 상태
@@ -48,6 +71,7 @@ export type SkillSet = Record<SkillTier, SkillStats>;
 
 export interface Combatant {
   skills: SkillSet;
+  sanityRules: SanityRules;
   maxHp: number; // maxHpForFloor(floor)로 결정
   hp: number;
   sanity: number; // -45 ~ +45
@@ -69,12 +93,39 @@ export type Coins = boolean[];
 /** 보상 티어: 높을수록 효과 크고 등장 확률 낮음 */
 export type RewardTier = 1 | 2 | 3 | 4 | 5;
 
-/** 보상이 일으키는 변화 하나. 음수도 가능 (예: 코인 위력 -1) */
-export interface RewardEffect {
+/**
+ * 보상 수치 식: 계수 * (그 스킬의 현재 스탯들의 곱). 소수가 나오면 반올림한다.
+ *   +(코인 개수)            → { factor: 1, of: ['coinCount'] }
+ *   +(코인 개수 * 코인 위력) → { factor: 1, of: ['coinCount', 'coinPower'] }
+ *   -(코인 위력 * 2)         → { factor: -2, of: ['coinPower'] }
+ * 한 보상 안의 모든 효과는 보상을 적용하기 "전"의 스탯으로 계산한다 (효과 순서와 무관).
+ */
+export interface AmountFormula {
+  factor: number;
+  of: readonly SkillStatKey[];
+}
+
+/** 숫자 그대로이거나, 스킬의 현재 스탯을 참조하는 식 */
+export type RewardAmount = number | AmountFormula;
+
+/** 스킬 스탯 하나를 바꾸는 효과. 수치는 음수도, 스탯 참조 식도 가능 */
+export interface SkillEffect {
   skillTier: SkillTier; // 어느 스킬의
   stat: SkillStatKey; // 어느 수치를
-  amount: number; // 얼마나 바꾸는가
+  amount: RewardAmount; // 얼마나 바꾸는가
 }
+
+/** 플레이어/적 본체의 정신력 규칙(합 승리/패배 시 증감)을 바꾸는 효과 */
+export interface SanityRuleEffect {
+  rule: SanityRuleKey;
+  amount: number;
+}
+
+/** 보상이 일으키는 변화 하나 */
+export type RewardEffect = SkillEffect | SanityRuleEffect;
+
+export const isSanityRuleEffect = (effect: RewardEffect): effect is SanityRuleEffect =>
+  'rule' in effect;
 
 /** 하나의 보상 = 효과 1개 이상 (예: 코인 개수 +1 과 코인 위력 -1 을 동시에) */
 export interface Reward {
@@ -104,6 +155,9 @@ export interface AttackHit {
   targetHpAfter: number;
 }
 
+/** 정신력이 변한 원인: 스킬 사용(합 직전) / 합 승리 / 합 패배 */
+export type SanityCause = 'skillUse' | 'clashWin' | 'clashLose';
+
 /** kill: 체력이 0이 되어 종료 / turnLimit: 제한 턴 초과로 플레이어 패배 */
 export type BattleEndReason = 'kill' | 'turnLimit';
 
@@ -119,7 +173,7 @@ export type BattleEvent =
   | { type: 'clashEnd'; winner: Side; remainingCoins: number }
   /** 합이 MAX_CLASH_ROUNDS까지 끝나지 않음: 무승부 처리, 양측 공격 없음, 정신력 변동 없음 */
   | { type: 'clashStalemate'; rounds: number }
-  | { type: 'sanityChange'; side: Side; from: number; to: number }
+  | { type: 'sanityChange'; side: Side; from: number; to: number; cause: SanityCause }
   | {
       type: 'attack';
       attacker: Side;

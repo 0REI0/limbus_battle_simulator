@@ -169,13 +169,16 @@ export function buildFrames(events: readonly BattleEvent[], maxHp: number): Fram
         );
         break;
 
-      case 'sanityChange':
+      case 'sanityChange': {
+        const cause =
+          e.cause === 'skillUse' ? '스킬 사용' : e.cause === 'clashWin' ? '합 승리' : '합 패배';
         push(
           { ...view, sanity: { ...view.sanity, [e.side]: e.to } },
-          `${owner(e.side)} 정신력 ${e.from} → ${e.to} (앞면 확률 ${COIN.baseHeadsPercent + e.to}%)`,
+          `${owner(e.side)} 정신력 ${e.from} → ${e.to} (${cause}, 앞면 확률 ${COIN.baseHeadsPercent + e.to}%)`,
           DELAY.sanity,
         );
         break;
+      }
 
       case 'attack': {
         const target = opposite(e.attacker);

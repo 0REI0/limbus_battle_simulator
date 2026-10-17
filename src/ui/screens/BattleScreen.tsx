@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
-import type { BattleResult, ClashSide, Side, SkillSet, SkillTier } from '../../core/types';
+import type { BattleResult, ClashSide, Side, SkillSet, SkillTier, UnitSpec } from '../../core/types';
 import { maxHpForFloor } from '../../data/balance';
 import { BattleLog } from '../components/BattleLog';
 import { CoinRow, type CoinSize } from '../components/Coin';
@@ -23,7 +23,7 @@ function coinSizeFor(maxCoins: number): CoinSize {
 
 // ---------- 1) 체력 / 정신력 ----------
 
-function Fighter({ side, view }: { side: Side; view: BattleView }) {
+function Fighter({ side, view, spec }: { side: Side; view: BattleView; spec: UnitSpec }) {
   return (
     <section className={`fighter fighter--${side}`} aria-label={NAME[side]}>
       <div className="fighter__head">
@@ -33,7 +33,7 @@ function Fighter({ side, view }: { side: Side; view: BattleView }) {
         </p>
       </div>
       <HpBar hp={view.hp[side]} max={view.maxHp} side={side} />
-      <SanityMeter sanity={view.sanity[side]} />
+      <SanityMeter sanity={view.sanity[side]} rules={spec.sanity} />
     </section>
   );
 }
@@ -187,16 +187,16 @@ function Arena({ view, specs }: { view: BattleView; specs: Record<Side, SkillSet
 
 export function BattleScreen({
   floor,
-  skills,
-  enemySkills,
+  player,
+  enemy,
   battle,
   speed,
   onSpeedChange,
   onContinue,
 }: {
   floor: number;
-  skills: SkillSet;
-  enemySkills: SkillSet;
+  player: UnitSpec;
+  enemy: UnitSpec;
   battle: BattleResult;
   /** 재생 배속. 층이 바뀌어도 유지되도록 부모가 들고 있다 */
   speed: number;
@@ -210,7 +210,7 @@ export function BattleScreen({
     () => frames.slice(0, index + 1).flatMap((f) => (f.log === null ? [] : [f.log])),
     [frames, index],
   );
-  const specs: Record<Side, SkillSet> = { player: skills, enemy: enemySkills };
+  const specs: Record<Side, SkillSet> = { player: player.skills, enemy: enemy.skills };
   const view = frame.view;
 
   return (
@@ -250,8 +250,8 @@ export function BattleScreen({
 
       {/* 1) 체력 / 정신력 */}
       <div className="fighters">
-        <Fighter side="player" view={view} />
-        <Fighter side="enemy" view={view} />
+        <Fighter side="player" view={view} spec={player} />
+        <Fighter side="enemy" view={view} spec={enemy} />
       </div>
 
       {/* 2) 배틀 화면 */}
@@ -263,11 +263,11 @@ export function BattleScreen({
       <div className="duo">
         <section className="panel" aria-label="플레이어 스킬">
           <h2 className="panel__title">플레이어</h2>
-          <SkillList side="player" skills={skills} active={view.tiers.player} remaining={view.deck.player} />
+          <SkillList side="player" skills={player.skills} active={view.tiers.player} remaining={view.deck.player} />
         </section>
         <section className="panel panel--enemy" aria-label="적 스킬">
           <h2 className="panel__title">적</h2>
-          <SkillList side="enemy" skills={enemySkills} active={view.tiers.enemy} remaining={view.deck.enemy} />
+          <SkillList side="enemy" skills={enemy.skills} active={view.tiers.enemy} remaining={view.deck.enemy} />
         </section>
       </div>
       <p className="hint">

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createCombatant, runBattle } from '../src/core/battle';
 import { createRng } from '../src/core/rng';
 import type { BattleEvent } from '../src/core/types';
-import { BASE_SKILLS, DECK_COMPOSITION, MAX_TURNS_PER_BATTLE, maxHpForFloor } from '../src/data/balance';
+import { DECK_COMPOSITION, MAX_TURNS_PER_BATTLE, baseSpec, maxHpForFloor } from '../src/data/balance';
 import { buildFrames, initialView } from '../src/ui/playback';
 
 /** 손으로 만든 이벤트: 플레이어가 합에서 이기고 2번 타격해 적 체력이 100 → 71이 되는 한 턴 */
@@ -16,7 +16,7 @@ const manual: BattleEvent[] = [
     result: 'player',
   },
   { type: 'clashEnd', winner: 'player', remainingCoins: 3 },
-  { type: 'sanityChange', side: 'player', from: 0, to: 5 },
+  { type: 'sanityChange', side: 'player', from: 0, to: 5, cause: 'clashWin' },
   {
     type: 'attack',
     attacker: 'player',
@@ -99,7 +99,7 @@ describe('buildFrames: 로그 문구', () => {
     expect(logs[1]).toBe('1턴: 플레이어 1스킬, 적 2스킬');
     expect(logs[2]).toBe('1합: 플레이어 위력 11(앞면 1/1), 적 위력 4(앞면 0/2). 플레이어가 우세');
     expect(logs[3]).toBe('합 종료: 플레이어가 승리, 남은 코인 3개');
-    expect(logs[4]).toBe('플레이어 정신력 0 → 5 (앞면 확률 55%)');
+    expect(logs[4]).toBe('플레이어 정신력 0 → 5 (합 승리, 앞면 확률 55%)');
     expect(logs[5]).toBe('플레이어 1스킬 공격: 코인 2개');
   });
 
@@ -164,7 +164,7 @@ describe('buildFrames: 로그 문구', () => {
           enemy: { coins: [true], heads: 1, power: 5, coinCountAfter: 1 },
           result: 'enemy',
         },
-        { type: 'sanityChange', side: 'enemy', from: 0, to: 5 },
+        { type: 'sanityChange', side: 'enemy', from: 0, to: 5, cause: 'clashWin' },
       ],
       100,
     );
@@ -172,7 +172,7 @@ describe('buildFrames: 로그 문구', () => {
     expect(logs[1]).toContain('2합:');
     expect(logs[1]).toMatch(/무승부$/);
     expect(logs[2]).toMatch(/적이 우세$/);
-    expect(logs[3]).toBe('적 정신력 0 → 5 (앞면 확률 55%)');
+    expect(logs[3]).toBe('적 정신력 0 → 5 (합 승리, 앞면 확률 55%)');
   });
 });
 
@@ -225,7 +225,7 @@ describe('buildFrames: 묶음에 남은 스킬 수', () => {
     const total = (d: Record<1 | 2 | 3, number>) => d[1] + d[2] + d[3];
     for (let seed = 1; seed <= 300; seed++) {
       const rng = createRng(seed);
-      const result = runBattle(createCombatant(BASE_SKILLS, 1, rng), createCombatant(BASE_SKILLS, 1, rng), rng);
+      const result = runBattle(createCombatant(baseSpec(), 1, rng), createCombatant(baseSpec(), 1, rng), rng);
       for (const f of buildFrames(result.events, maxHpForFloor(1))) {
         if (f.view.stage !== 'skills') continue; // 턴 시작 프레임
         const expectedTotal = 6 - (((f.view.turn - 1) % 6) + 1);
@@ -235,6 +235,67 @@ describe('buildFrames: 묶음에 남은 스킬 수', () => {
             expect(f.view.deck[side][tier]).toBeGreaterThanOrEqual(0);
             expect(f.view.deck[side][tier]).toBeLessThanOrEqual(DECK_COMPOSITION[tier]);
           }
+        }
+      }
+    }
+  });
+});
+
+describe('buildFrames: 정신력 변화 로그와 화면 반영', () => {
+  const change = (side: 'player' | 'enemy', from: number, to: number, cause: 'skillUse' | 'clashWin' | 'clashLose'): BattleEvent => ({
+    type: 'sanityChange',
+    side,
+    from,
+    to,
+    cause,
+  });
+
+  it('원인(스킬 사용 / 합 승리 / 합 패배)이 로그에 표시된다', () => {
+    const frames = buildFrames(
+      [change('player', 0, 7, 'skillUse'), change('enemy', 0, 5, 'clashWin'), change('player', 7, 4, 'clashLose')],
+      100,
+    );
+    expect(frames.map((f) => f.log).slice(1)).toEqual([
+      '플레이어 정신력 0 → 7 (스킬 사용, 앞면 확률 57%)',
+      '적 정신력 0 → 5 (합 승리, 앞면 확률 55%)',
+      '플레이어 정신력 7 → 4 (합 패배, 앞면 확률 54%)',
+    ]);
+  });
+
+  it('음수 정신력의 앞면 확률도 맞게 표시된다', () => {
+    const frames = buildFrames([change('enemy', 0, -12, 'skillUse')], 100);
+    expect(frames[1].log).toBe('적 정신력 0 → -12 (스킬 사용, 앞면 확률 38%)');
+  });
+
+  it('스킬 사용 정신력은 스킬 공개 단계(합 시작 전)의 화면에 바로 반영되고, 단계는 바뀌지 않는다', () => {
+    const frames = buildFrames(
+      [{ type: 'turnStart', turn: 1, playerTier: 2, enemyTier: 1 }, change('player', 0, 6, 'skillUse'), change('enemy', 0, -3, 'skillUse')],
+      100,
+    );
+    expect(frames[1].view.stage).toBe('skills');
+    expect(frames[1].view.sanity).toEqual({ player: 0, enemy: 0 });
+    expect(frames[2].view.stage).toBe('skills');
+    expect(frames[2].view.sanity).toEqual({ player: 6, enemy: 0 });
+    expect(frames[3].view.sanity).toEqual({ player: 6, enemy: -3 });
+  });
+
+  it('실제 전투 300판: 화면의 정신력이 이벤트를 그대로 따라가고 범위를 벗어나지 않는다', () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const rng = createRng(seed);
+      const skills = baseSpec().skills;
+      const withSanity = { ...skills, 2: { ...skills[2], sanityOnUse: 4 }, 3: { ...skills[3], sanityOnUse: -3 } };
+      const spec = { skills: withSanity, sanity: { sanityOnClashWin: 7, sanityOnClashLose: -2 } };
+      const result = runBattle(createCombatant(spec, 1, rng), createCombatant(spec, 1, rng), rng);
+      const frames = buildFrames(result.events, maxHpForFloor(1));
+      const last = frames[frames.length - 1].view;
+
+      const expected = { player: 0, enemy: 0 };
+      for (const e of result.events) if (e.type === 'sanityChange') expected[e.side] = e.to;
+      expect(last.sanity).toEqual(expected);
+      for (const f of frames) {
+        for (const side of ['player', 'enemy'] as const) {
+          expect(f.view.sanity[side]).toBeGreaterThanOrEqual(-45);
+          expect(f.view.sanity[side]).toBeLessThanOrEqual(45);
         }
       }
     }
@@ -292,8 +353,8 @@ describe('buildFrames: 실제 전투 300판', () => {
   it('프레임 수, 체력 변화, 종료 상태, 로그 형식이 이벤트와 일치한다', () => {
     for (let seed = 1; seed <= 300; seed++) {
       const rng = createRng(seed);
-      const player = createCombatant(BASE_SKILLS, 1, rng);
-      const enemy = createCombatant(BASE_SKILLS, 1, rng);
+      const player = createCombatant(baseSpec(), 1, rng);
+      const enemy = createCombatant(baseSpec(), 1, rng);
       const result = runBattle(player, enemy, rng);
       const maxHp = maxHpForFloor(1);
       const frames = buildFrames(result.events, maxHp);

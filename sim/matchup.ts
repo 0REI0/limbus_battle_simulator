@@ -12,8 +12,15 @@
 import { createCombatant, runBattle } from '../src/core/battle';
 import { createRng } from '../src/core/rng';
 import type { Combatant, SkillTier } from '../src/core/types';
-import { BASE_SKILLS, COIN, DECK_COMPOSITION } from '../src/data/balance';
-import { computeMatchup, DECK_SIZE, TIERS, turnExpectation, winnerHeadsProb, type Matchup } from '../src/core/evaluate';
+import { BASE_SKILLS, COIN, DECK_COMPOSITION, baseSanityRules, baseSpec } from '../src/data/balance';
+import {
+  attackHeadsProbability,
+  computeMatchup,
+  DECK_SIZE,
+  TIERS,
+  turnExpectation,
+  type Matchup,
+} from '../src/core/evaluate';
 import { applyOverrides } from './overrides';
 
 const overrides = applyOverrides();
@@ -23,7 +30,7 @@ const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const cell = (s: string) => s.padStart(9);
 
 const matrix = new Map<string, Matchup>();
-for (const r of TIERS) for (const c of TIERS) matrix.set(`${r}-${c}`, computeMatchup(r, c, BASE_SKILLS, BASE_SKILLS));
+for (const r of TIERS) for (const c of TIERS) matrix.set(`${r}-${c}`, computeMatchup(r, c, baseSpec(), baseSpec()));
 const m = (r: SkillTier, c: SkillTier) => matrix.get(`${r}-${c}`)!;
 
 const specLine = TIERS.map((t) => {
@@ -33,7 +40,7 @@ const specLine = TIERS.map((t) => {
 console.log(`\n기본 스펙: ${specLine}`);
 console.log(
   `합 중 앞면 확률 ${COIN.baseHeadsPercent + COIN.initialSanity}%, ` +
-    `승자 공격 시 앞면 확률 ${(winnerHeadsProb() * 100).toFixed(0)}% (정신력 ${COIN.sanityMode})`,
+    `승자 공격 시 앞면 확률 ${(attackHeadsProbability(BASE_SKILLS[1], baseSanityRules()) * 100).toFixed(0)}% (정신력 ${COIN.sanityMode})`,
 );
 
 console.log('\n[합 승률: 행 스킬이 열 스킬을 이길 확률 (무승부는 재시도하므로 제외)]');
@@ -74,7 +81,7 @@ for (const r of TIERS) {
     `${r}스킬   ${pct(win).padStart(8)}   ${dealt.toFixed(1).padStart(14)}   ${taken.toFixed(1).padStart(16)}`,
   );
 }
-const turn = turnExpectation(BASE_SKILLS, BASE_SKILLS);
+const turn = turnExpectation(baseSpec(), baseSpec());
 console.log(
   `\n한 턴에 한쪽이 입히는 평균 기대 데미지(양측 동일 스펙): ${turn.dealt.toFixed(1)} (양측 합산 ${(turn.dealt * 2).toFixed(1)})`,
 );
@@ -94,7 +101,7 @@ if (verifyIdx >= 0) {
         const rng = createRng(seed * 7919 + r * 31 + c);
         // 체력 1이라 첫 공격으로 전투가 끝난다 → 1턴의 합 결과만 관찰
         const mk = (tier: SkillTier): Combatant => ({
-          ...createCombatant(BASE_SKILLS, 1, rng),
+          ...createCombatant(baseSpec(), 1, rng),
           maxHp: 1,
           hp: 1,
           deck: [tier],

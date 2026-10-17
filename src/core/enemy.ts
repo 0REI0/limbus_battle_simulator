@@ -9,24 +9,24 @@
 //             예: [60, 30, 10]이면 60%는 가장 좋은 선택지, 30%는 두 번째, 10%는 세 번째.
 // ============================================================
 
-import { BASE_SKILLS, ENEMY, rewardCountForFloor } from '../data/balance';
-import { skillSetValue } from './evaluate';
+import { ENEMY, baseSpec, rewardCountForFloor } from '../data/balance';
+import { specValue } from './evaluate';
 import { applyRandomRewards, applyReward, generateChoices } from './rewards';
-import type { Reward, Rng, SkillSet } from './types';
+import type { Reward, Rng, UnitSpec } from './types';
 
 /**
- * 선택지를 "그 보상을 받은 뒤의 스킬 가치"(skillSetValue)가 높은 순으로 정렬했을 때 rank번째 보상을 고른다.
+ * 선택지를 "그 보상을 받은 뒤의 스펙 가치"(specValue)가 높은 순으로 정렬했을 때 rank번째 보상을 고른다.
  * rank는 1부터 시작하고, 범위를 벗어나면 가장 가까운 끝(가장 좋은 것/가장 낮은 것)으로 맞춘다.
  * 가치가 같으면 선택지 순서를 유지한다.
  */
-export function pickEnemyReward(skills: SkillSet, choices: readonly Reward[], rank: number): Reward {
+export function pickEnemyReward(spec: UnitSpec, choices: readonly Reward[], rank: number): Reward {
   if (choices.length === 0) throw new Error('보상 선택지가 비어 있음');
 
   const ranked = choices
     .map((reward, index) => ({
       reward,
       index,
-      value: skillSetValue(applyReward(skills, reward)),
+      value: specValue(applyReward(spec, reward)),
     }))
     .sort((a, b) => b.value - a.value || a.index - b.index);
 
@@ -60,19 +60,19 @@ export function chooseEnemyRank(weights: readonly number[], choiceCount: number,
   return lastPositive; // 부동소수점 오차 대비
 }
 
-export function createEnemySkills(floor: number, rng: Rng): SkillSet {
+export function createEnemySpec(floor: number, rng: Rng): UnitSpec {
   const count = rewardCountForFloor(floor);
 
   if (ENEMY.pickMode === 'random') {
-    return applyRandomRewards(BASE_SKILLS, count, rng);
+    return applyRandomRewards(baseSpec(), count, rng);
   }
 
-  let skills = BASE_SKILLS;
+  let spec = baseSpec();
   for (let i = 0; i < count; i++) {
     const choices = generateChoices(rng);
     if (choices.length === 0) break;
     const rank = chooseEnemyRank(ENEMY.rankWeights, choices.length, rng);
-    skills = applyReward(skills, pickEnemyReward(skills, choices, rank));
+    spec = applyReward(spec, pickEnemyReward(spec, choices, rank));
   }
-  return skills;
+  return spec;
 }

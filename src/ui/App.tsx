@@ -52,8 +52,8 @@ export default function App() {
     screen = (
       <BattleScreen
         floor={state.floor}
-        skills={state.skills}
-        enemySkills={state.enemySkills}
+        player={state.player}
+        enemy={state.enemy}
         battle={state.battle}
         speed={speed}
         onSpeedChange={setSpeed}

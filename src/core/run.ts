@@ -10,12 +10,12 @@
 // 같은 상태에서 같은 함수를 몇 번 호출해도 결과가 같다 (React useReducer와 호환).
 // ============================================================
 
-import { BASE_SKILLS, REWARDS } from '../data/balance';
+import { REWARDS, baseSpec } from '../data/balance';
 import { createCombatant, runBattle } from './battle';
-import { createEnemySkills } from './enemy';
+import { createEnemySpec } from './enemy';
 import { applyReward, generateChoices } from './rewards';
 import { createRng, deriveSeed } from './rng';
-import type { BattleResult, Reward, Rng, SkillSet } from './types';
+import type { BattleResult, Reward, Rng, UnitSpec } from './types';
 
 /**
  * reward:   보상 선택 중 (choices 중 하나를 고른다)
@@ -28,11 +28,11 @@ export interface RunState {
   seed: number;
   floor: number; // 현재 층 (1부터)
   phase: RunPhase;
-  skills: SkillSet; // 플레이어의 현재 스킬 스펙
+  player: UnitSpec; // 플레이어의 현재 스펙 (스킬 + 정신력 규칙)
   history: Reward[]; // 지금까지 고른 보상 (순서대로)
   picksLeft: number; // 이번 층에서 남은 보상 선택 횟수
   choices: Reward[]; // 현재 선택지 (reward 단계에서만 값이 있음)
-  enemySkills: SkillSet; // 이번 층 적의 스펙 (층이 시작될 때 정해지고, 보상 선택 화면에서 미리 공개된다)
+  enemy: UnitSpec; // 이번 층 적의 스펙 (층이 시작될 때 정해지고, 보상 선택 화면에서 미리 공개된다)
   battle: BattleResult | null; // 이번 층 전투 결과 (이벤트 로그 포함)
 }
 
@@ -45,8 +45,8 @@ const rngFor = (seed: number, floor: number, stream: number): Rng =>
   createRng(deriveSeed(seed, floor * 100 + stream));
 
 /** 그 층의 적 스펙. 시드와 층수로만 정해지므로 플레이어가 어떤 보상을 고르든 같다 */
-const enemyFor = (seed: number, floor: number): SkillSet =>
-  createEnemySkills(floor, rngFor(seed, floor, STREAM_ENEMY));
+const enemyFor = (seed: number, floor: number): UnitSpec =>
+  createEnemySpec(floor, rngFor(seed, floor, STREAM_ENEMY));
 
 const choicesFor = (seed: number, floor: number, pickIndex: number): Reward[] =>
   generateChoices(rngFor(seed, floor, pickIndex));
@@ -57,22 +57,22 @@ export function startRun(seed: number): RunState {
     seed,
     floor: 1,
     phase: 'reward',
-    skills: BASE_SKILLS,
+    player: baseSpec(),
     history: [],
     picksLeft: REWARDS.picksPerFloor,
     choices: choicesFor(seed, 1, 0),
-    enemySkills: enemyFor(seed, 1),
+    enemy: enemyFor(seed, 1),
     battle: null,
   };
 }
 
-/** 선택지 중 하나를 고른다. 마지막 선택이면 적을 생성하고 전투까지 자동으로 진행한다. */
+/** 선택지 중 하나를 고른다. 마지막 선택이면 자동으로 전투까지 진행한다. */
 export function chooseReward(state: RunState, rewardId: string): RunState {
   if (state.phase !== 'reward') return state;
   const reward = state.choices.find((c) => c.id === rewardId);
   if (!reward) return state;
 
-  const skills = applyReward(state.skills, reward);
+  const player = applyReward(state.player, reward);
   const history = [...state.history, reward];
   const picksLeft = state.picksLeft - 1;
 
@@ -80,20 +80,20 @@ export function chooseReward(state: RunState, rewardId: string): RunState {
     const pickIndex = REWARDS.picksPerFloor - picksLeft;
     return {
       ...state,
-      skills,
+      player,
       history,
       picksLeft,
       choices: choicesFor(state.seed, state.floor, pickIndex),
     };
   }
-  return fightFloor({ ...state, skills, history, picksLeft: 0, choices: [] });
+  return fightFloor({ ...state, player, history, picksLeft: 0, choices: [] });
 }
 
 /** 전투 진행. 적은 층이 시작될 때 이미 정해져 있다. 체력과 정신력은 층마다 초기화되므로 이전 전투 상태는 필요 없다. */
 function fightFloor(state: RunState): RunState {
   const rng = rngFor(state.seed, state.floor, STREAM_BATTLE);
-  const player = createCombatant(state.skills, state.floor, rng);
-  const enemy = createCombatant(state.enemySkills, state.floor, rng);
+  const player = createCombatant(state.player, state.floor, rng);
+  const enemy = createCombatant(state.enemy, state.floor, rng);
   const battle = runBattle(player, enemy, rng);
 
   return { ...state, phase: 'battle', battle };
@@ -114,7 +114,7 @@ export function advanceFloor(state: RunState): RunState {
     phase: 'reward',
     picksLeft: REWARDS.picksPerFloor,
     choices: choicesFor(state.seed, floor, 0),
-    enemySkills: enemyFor(state.seed, floor),
+    enemy: enemyFor(state.seed, floor),
     battle: null,
   };
 }

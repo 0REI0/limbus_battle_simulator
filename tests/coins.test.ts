@@ -47,8 +47,8 @@ describe('rollCoins', () => {
 });
 
 describe('최종 위력', () => {
-  const single = { basePower: 4, coinPower: 7, coinCount: 1 };
-  const triple = { basePower: 5, coinPower: 3, coinCount: 3 };
+  const single = { basePower: 4, coinPower: 7, coinCount: 1, sanityOnUse: 0 };
+  const triple = { basePower: 5, coinPower: 3, coinCount: 3, sanityOnUse: 0 };
 
   it('기본 위력 + 코인 위력 * 앞면 수', () => {
     expect(finalPower(single, 0)).toBe(4);
@@ -58,7 +58,7 @@ describe('최종 위력', () => {
 });
 
 describe('마이너스 코인 위력', () => {
-  const negative = { basePower: 3, coinPower: -2, coinCount: 3 };
+  const negative = { basePower: 3, coinPower: -2, coinCount: 3, sanityOnUse: 0 };
 
   it('앞면이 나올수록 위력이 줄고, 0 아래로는 내려가지 않는다', () => {
     expect(finalPower(negative, 0)).toBe(3);
@@ -77,13 +77,13 @@ describe('마이너스 코인 위력', () => {
 describe('computeHits', () => {
   it('타격마다 누적 앞면 수로 위력을 계산한다', () => {
     // 기본 4, 코인 위력 4
-    const hits = computeHits({ basePower: 4, coinPower: 4, coinCount: 3 }, [true, false, true]);
+    const hits = computeHits({ basePower: 4, coinPower: 4, coinCount: 3, sanityOnUse: 0 }, [true, false, true]);
     expect(hits.map((h) => h.headsSoFar)).toEqual([1, 1, 2]);
     expect(hits.map((h) => h.power)).toEqual([8, 8, 12]);
     expect(hits.map((h) => h.coinIndex)).toEqual([0, 1, 2]);
   });
 
   it('코인이 없으면 타격도 없다', () => {
-    expect(computeHits({ basePower: 4, coinPower: 7, coinCount: 1 }, [])).toEqual([]);
+    expect(computeHits({ basePower: 4, coinPower: 7, coinCount: 1, sanityOnUse: 0 }, [])).toEqual([]);
   });
 });

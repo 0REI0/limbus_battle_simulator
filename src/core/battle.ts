@@ -3,12 +3,14 @@
 //
 // 한 턴의 흐름:
 //   1) 양쪽이 묶음에서 스킬을 하나씩 뽑는다
-//   2) 합: 양쪽 코인을 한 번에 굴려 위력 비교 → 낮은 쪽 코인 -1 (같으면 변화 없음)
+//   2) 스킬 사용 정신력: 뽑은 스킬의 sanityOnUse만큼 사용한 쪽의 정신력이 변한다 (합 직전)
+//   3) 합: 양쪽 코인을 한 번에 굴려 위력 비교 → 낮은 쪽 코인 -1 (같으면 변화 없음)
 //          한쪽 코인이 0이 될 때까지 반복 (정신력은 합 도중 변하지 않음)
 //          MAX_CLASH_ROUNDS까지 끝나지 않으면 무승부: 공격/정신력 변동 없이 다음 턴
-//   3) 합 종료 시 정신력 변동 (승자/패자 각 1회) - 공격 코인을 굴리기 전에 적용
-//   4) 합에서 이긴 쪽만 공격: 남은 코인을 한 번에 굴려 타격별 데미지 계산
-//   5) 상대 체력이 0이 되면 전투 종료, 아니면 다음 턴
+//   4) 합 결과 정신력: 승자는 자기 sanityOnClashWin, 패자는 자기 sanityOnClashLose만큼 변한다
+//      (공격 코인을 굴리기 전에 적용)
+//   5) 합에서 이긴 쪽만 공격: 남은 코인을 한 번에 굴려 타격별 데미지 계산
+//   6) 상대 체력이 0이 되면 전투 종료, 아니면 다음 턴
 //      MAX_TURNS_PER_BATTLE 안에 끝나지 않으면 플레이어 패배 (목표 턴 제한)
 // ============================================================
 
@@ -22,18 +24,20 @@ import type {
   ClashSide,
   Combatant,
   Rng,
+  SanityCause,
   Side,
-  SkillSet,
   SkillTier,
+  UnitSpec,
 } from './types';
 
 const opponent = (side: Side): Side => (side === 'player' ? 'enemy' : 'player');
 
 /** 층 시작 시 전투용 상태 생성 (체력 최대, 정신력 초기화, 새 스킬 묶음) */
-export function createCombatant(skills: SkillSet, floor: number, rng: Rng): Combatant {
+export function createCombatant(spec: UnitSpec, floor: number, rng: Rng): Combatant {
   const maxHp = maxHpForFloor(floor);
   return {
-    skills,
+    skills: spec.skills,
+    sanityRules: { ...spec.sanity },
     maxHp,
     hp: maxHp,
     sanity: COIN.initialSanity,
@@ -52,6 +56,16 @@ export function runBattle(playerInit: Combatant, enemyInit: Combatant, rng: Rng)
   };
   const events: BattleEvent[] = [];
 
+  /** 정신력을 delta만큼 바꾼다 (범위 제한, 고정 모드에서는 변하지 않음). 실제로 바뀐 경우에만 이벤트를 남긴다 */
+  const applySanity = (side: Side, delta: number, cause: SanityCause) => {
+    if (COIN.sanityMode !== 'dynamic') return;
+    const from = units[side].sanity;
+    const to = clampSanity(from + delta);
+    if (to === from) return;
+    units[side].sanity = to;
+    events.push({ type: 'sanityChange', side, from, to, cause });
+  };
+
   for (let turn = 1; turn <= MAX_TURNS_PER_BATTLE; turn++) {
     // 1) 스킬 선택
     const tiers = {} as Record<Side, SkillTier>;
@@ -62,7 +76,12 @@ export function runBattle(playerInit: Combatant, enemyInit: Combatant, rng: Rng)
     }
     events.push({ type: 'turnStart', turn, playerTier: tiers.player, enemyTier: tiers.enemy });
 
-    // 2) 합
+    // 2) 스킬 사용 정신력: 합이 시작되기 직전에 적용 (이 정신력으로 합의 코인을 굴린다)
+    for (const side of ['player', 'enemy'] as const) {
+      applySanity(side, units[side].skills[tiers[side]].sanityOnUse, 'skillUse');
+    }
+
+    // 3) 합
     const counts: Record<Side, number> = {
       player: units.player.skills[tiers.player].coinCount,
       enemy: units.enemy.skills[tiers.enemy].coinCount,
@@ -114,20 +133,11 @@ export function runBattle(playerInit: Combatant, enemyInit: Combatant, rng: Rng)
     const remainingCoins = counts[winner];
     events.push({ type: 'clashEnd', winner, remainingCoins });
 
-    // 3) 정신력 변동 (합 종료 시 1회, 공격 전에 적용)
-    if (COIN.sanityMode === 'dynamic') {
-      const applySanity = (target: Side, delta: number) => {
-        const from = units[target].sanity;
-        const to = clampSanity(from + delta);
-        if (to === from) return;
-        units[target].sanity = to;
-        events.push({ type: 'sanityChange', side: target, from, to });
-      };
-      applySanity(winner, COIN.sanityOnClashWin);
-      applySanity(loser, COIN.sanityOnClashLose);
-    }
+    // 4) 합 결과 정신력: 승자/패자 각자의 규칙대로 1회 (공격 코인을 굴리기 전에 적용)
+    applySanity(winner, units[winner].sanityRules.sanityOnClashWin, 'clashWin');
+    applySanity(loser, units[loser].sanityRules.sanityOnClashLose, 'clashLose');
 
-    // 4) 공격 (합에서 이긴 쪽만)
+    // 5) 공격 (합에서 이긴 쪽만)
     const attacker = units[winner];
     const target = units[loser];
     const skill = attacker.skills[tiers[winner]];
@@ -142,7 +152,7 @@ export function runBattle(playerInit: Combatant, enemyInit: Combatant, rng: Rng)
     }
     events.push({ type: 'attack', attacker: winner, tier: tiers[winner], coins, hits });
 
-    // 5) 종료 판정
+    // 6) 종료 판정
     if (target.hp === 0) {
       events.push({ type: 'battleEnd', winner, turns: turn, reason: 'kill' });
       return { winner, reason: 'kill', turns: turn, events };
