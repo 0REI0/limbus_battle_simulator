@@ -160,11 +160,11 @@ export const REWARD_TABLE: Record<RewardTier, RewardEffect[][]> = {
 
 /** 보상 티어 등장 가중치 (높은 티어일수록 낮음). 시뮬레이션으로 조정 */
 export const REWARD_TIER_WEIGHTS: Record<RewardTier, number> = {
-  1: 33,
+  1: 34,
   2: 30,
   3: 20,
   4: 15,
-  5: 2,
+  5: 1,
 };
 
 export const REWARDS = {
